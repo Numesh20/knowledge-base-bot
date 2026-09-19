@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KnowledgeBot — AI Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      <div class="logo-text">
+        <h1>KnowledgeBot</h1>
+        <span>Powered by Gemini</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-panel">
+    <h3>Knowledge Base</h3>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span class="stat-num" id="stat-docs">0</span>
+        <span class="stat-label">Documents</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-num" id="stat-chunks">0</span>
+        <span class="stat-label">Chunks</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-num" id="stat-chats">0</span>
+        <span class="stat-label">Messages</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loaded files -->
+  <div class="files-panel">
+    <h3>Loaded Files</h3>
+    <div class="files-list" id="files-list">
+      <p class="no-files">No files yet</p>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-panel">
+    <h3>Add Knowledge</h3>
+    <p class="upload-hint">Upload a .txt file to teach the bot new information</p>
+    <label class="upload-btn" id="upload-label">
+      <span id="upload-text">📄 Choose .txt File</span>
+      <input type="file" id="file-input" accept=".txt" style="display:none" onchange="uploadFile(this)"/>
+    </label>
+    <div class="upload-status" id="upload-status"></div>
+  </div>
+
+  <!-- Clear -->
+  <button class="clear-btn" onclick="clearHistory()">🗑️ Clear Chat History</button>
+</aside>
+
+<!-- ── MAIN CHAT ── -->
+<main class="chat-area">
+  <div class="chat-header">
+    <div class="header-info">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="header-status">Loading knowledge base...</span>
+    </div>
+    <div class="header-hint">Ask anything about your documents</div>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="welcome-screen" id="welcome">
+      <div class="welcome-icon">🧠</div>
+      <h2>Welcome to KnowledgeBot</h2>
+      <p>I can answer questions from your uploaded documents.<br/>
+         Upload a <strong>.txt</strong> file on the left, or ask me about the sample knowledge!</p>
+      <div class="quick-prompts">
+        <button class="quick-btn" onclick="sendQuick('What are the working hours?')">⏰ Working hours?</button>
+        <button class="quick-btn" onclick="sendQuick('What products do you sell?')">📦 Products?</button>
+        <button class="quick-btn" onclick="sendQuick('How do I contact support?')">📧 Contact info?</button>
+        <button class="quick-btn" onclick="sendQuick('Tell me about the company')">🏢 About company?</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-box">
+      <textarea id="user-input"
+        placeholder="Ask a question about your knowledge base..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+    <p class="input-hint">Press <kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> for new line</p>
+  </div>
+</main>
+
+<script src="/static/chat.js"></script>
+</body>
+</html>
