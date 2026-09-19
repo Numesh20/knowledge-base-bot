@@ -1,0 +1,13 @@
+# ─────────────────────────────────────────────
+#  Knowledge Base Bot — Python Dependencies
+#  Updated to use Google Gemini (FREE)
+# ─────────────────────────────────────────────
+
+# Google Gemini SDK — FREE AI (replaces OpenAI)
+google-generativeai>=0.7.0
+
+# ChromaDB — local vector database (stores our embeddings)
+chromadb>=0.5.0
+
+# Utilities
+python-dotenv>=1.0.0       # Load API keys from .env file

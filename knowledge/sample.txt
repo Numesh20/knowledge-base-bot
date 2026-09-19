@@ -1,0 +1,22 @@
+This is a sample knowledge base file.
+
+=== Company Information ===
+Our company is TechCorp, founded in 2015.
+We specialize in AI-powered software solutions.
+Our headquarters is located in San Francisco, CA.
+We have over 500 employees worldwide.
+
+=== Products ===
+1. SmartBot Pro — An AI chatbot for customer support
+2. DataSense — A business intelligence platform
+3. AutoFlow — A workflow automation tool
+
+=== Contact ===
+Email: support@techcorp.com
+Phone: +1-800-555-0100
+Website: https://www.techcorp.com
+
+=== Working Hours ===
+Monday to Friday: 9 AM – 6 PM (PST)
+Saturday: 10 AM – 2 PM (PST)
+Sunday: Closed

@@ -1,0 +1,7 @@
+# .gitignore — Files Git should NOT track
+.env              # Your secret API keys
+chroma_db/        # Vector database (auto-generated, large)
+__pycache__/      # Python bytecode cache
+*.pyc             # Compiled Python files
+venv/             # Virtual environment folder
+.venv/
