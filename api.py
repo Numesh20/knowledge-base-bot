@@ -33,6 +33,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from pypdf import PdfReader
 import uvicorn
 
 # ── Gemini client ──
@@ -48,6 +49,22 @@ chunk_count = 0
 chat_history = []
 
 # ── Helpers ──
+def extract_text_from_file(file_path):
+    """Extract text from a .txt or .pdf file."""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".txt":
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    elif ext == ".pdf":
+        reader = PdfReader(file_path)
+        pages_text = []
+        for page in reader.pages:
+            t = page.extract_text() or ""
+            if t.strip():
+                pages_text.append(t.strip())
+        return "\n\n".join(pages_text)
+    return ""
+
 def chunk_text(text, chunk_size=400, overlap=50):
     words = text.split()
     chunks = []
@@ -75,14 +92,22 @@ def build_kb():
         pass
     collection = db.create_collection("knowledge_base")
 
-    txt_files = glob.glob("knowledge/*.txt")
-    doc_count = len(txt_files)
+    files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    doc_count = len(files)
     chunk_count = 0
 
-    for file_path in txt_files:
+    for file_path in files:
         print(f"  [FILE] {file_path}")
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
+        try:
+            text = extract_text_from_file(file_path)
+        except Exception as e:
+            print(f"  [ERROR] Could not read {file_path}: {e}")
+            continue
+
+        if not text.strip():
+            print(f"  [WARN] No readable text found in {file_path}")
+            continue
+
         chunks = chunk_text(text)
         for i, chunk in enumerate(chunks):
             emb = get_embedding(chunk)
@@ -175,26 +200,29 @@ def chat(req: ChatRequest):
 # ── Upload endpoint ──
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    if not file.filename.endswith(".txt"):
-        raise HTTPException(status_code=400, detail="Only .txt files are supported")
+    filename = file.filename
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in [".txt", ".pdf"]:
+        raise HTTPException(status_code=400, detail="Only .txt and .pdf files are supported")
 
-    save_path = f"knowledge/{file.filename}"
+    save_path = f"knowledge/{filename}"
     with open(save_path, "wb") as f:
         content = await file.read()
         f.write(content)
 
     # Rebuild knowledge base
     build_kb()
-    return {"message": f"'{file.filename}' uploaded and learned!", "docs": doc_count, "chunks": chunk_count}
+    return {"message": f"'{filename}' uploaded and learned!", "docs": doc_count, "chunks": chunk_count}
 
 # ── Stats endpoint ──
 @app.get("/stats")
 def stats():
+    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
     return {
         "docs": doc_count,
         "chunks": chunk_count,
         "conversations": len(chat_history),
-        "files": [Path(f).name for f in glob.glob("knowledge/*.txt")]
+        "files": sorted([Path(f).name for f in all_files])
     }
 
 # ── Clear history ──

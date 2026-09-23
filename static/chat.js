@@ -34,9 +34,10 @@ async function loadStats() {
     if (data.files.length === 0) {
       filesList.innerHTML = '<p class="no-files">No files yet</p>';
     } else {
-      filesList.innerHTML = data.files.map(f =>
-        `<div class="file-tag"><span>📄 ${f}</span></div>`
-      ).join("");
+      filesList.innerHTML = data.files.map(f => {
+        const icon = f.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
+        return `<div class="file-tag"><span>${icon} ${f}</span></div>`;
+      }).join("");
     }
   } catch (err) {
     document.getElementById("status-dot").classList.add("loading");
@@ -192,7 +193,7 @@ async function uploadFile(input) {
     const data = await res.json();
     status.textContent = `✓ ${data.message}`;
     status.className = "upload-status success";
-    label.textContent = "📄 Choose .txt File";
+    label.textContent = "📁 Choose File (.txt / .pdf)";
 
     // Reload stats
     loadStats();
@@ -205,7 +206,7 @@ async function uploadFile(input) {
   } catch (err) {
     status.textContent = `✗ ${err.message}`;
     status.className = "upload-status error";
-    label.textContent = "📄 Choose .txt File";
+    label.textContent = "📁 Choose File (.txt / .pdf)";
   }
 
   // Reset file input

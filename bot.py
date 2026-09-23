@@ -37,6 +37,24 @@ from google.genai import types
 # ── Configure Gemini client ──
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+# ── Helper: extract text from file (.txt or .pdf) ──
+def extract_text_from_file(file_path):
+    """Extract text from a .txt or .pdf file."""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".txt":
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    elif ext == ".pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(file_path)
+        pages_text = []
+        for page in reader.pages:
+            t = page.extract_text() or ""
+            if t.strip():
+                pages_text.append(t.strip())
+        return "\n\n".join(pages_text)
+    return ""
+
 # ── Helper: split text into chunks ──
 def chunk_text(text, chunk_size=400, overlap=50):
     """Break a big text into smaller overlapping pieces."""
@@ -61,7 +79,7 @@ def get_embedding(text):
 
 # ── Build the Knowledge Base ──
 def build_knowledge_base():
-    """Load all .txt files from /knowledge folder and store in ChromaDB."""
+    """Load all .txt and .pdf files from /knowledge folder and store in ChromaDB."""
     print("\n[...] Building knowledge base...")
 
     # Connect to local ChromaDB (saves data in ./chroma_db folder)
@@ -75,18 +93,25 @@ def build_knowledge_base():
 
     collection = db.create_collection("knowledge_base")
 
-    # Find all .txt files in the knowledge/ folder
-    txt_files = glob.glob("knowledge/*.txt")
-    if not txt_files:
-        print("[WARN] No .txt files found in the knowledge/ folder!")
-        print("       Add some .txt files there and run again.")
+    # Find all .txt and .pdf files in the knowledge/ folder
+    files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    if not files:
+        print("[WARN] No .txt or .pdf files found in the knowledge/ folder!")
+        print("       Add some .txt or .pdf files there and run again.")
         return collection, 0
 
     total_chunks = 0
-    for file_path in txt_files:
+    for file_path in files:
         print(f"   [FILE] Loading: {file_path}")
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
+        try:
+            text = extract_text_from_file(file_path)
+        except Exception as e:
+            print(f"   [ERROR] Could not read {file_path}: {e}")
+            continue
+
+        if not text.strip():
+            print(f"   [WARN] No readable text found in {file_path}")
+            continue
 
         # Split into chunks
         chunks = chunk_text(text)
@@ -103,7 +128,7 @@ def build_knowledge_base():
             )
         total_chunks += len(chunks)
 
-    print(f"\n[READY] Knowledge base built! ({len(txt_files)} files, {total_chunks} chunks)\n")
+    print(f"\n[READY] Knowledge base built! ({len(files)} files, {total_chunks} chunks)\n")
     return collection, total_chunks
 
 # ── Retrieve relevant chunks ──
