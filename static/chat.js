@@ -56,14 +56,38 @@ function formatMessageText(text) {
     .replace(/^\* (.+)/gm, "• $1");
 }
 
-// ── Render Source Chips ──
+// ── Global Source Cache ──
+const sourceStore = {};
+
+// ── Render Interactive Source Chips ──
 function buildSourcesHTML(sources) {
   if (!sources || sources.length === 0) return "";
-  const tags = sources.map(s => {
-    const name = s.split(/[\\/]/).pop();
-    return `<span class="source-tag">${name}</span>`;
+  const tags = sources.map((s, idx) => {
+    let filename = "";
+    let chunkText = "";
+    let chunkNum = idx + 1;
+
+    if (typeof s === "string") {
+      filename = s.split(/[\\/]/).pop();
+      chunkText = `Document: ${filename}`;
+    } else {
+      filename = s.filename || (s.source ? s.source.split(/[\\/]/).pop() : "document");
+      chunkText = s.chunk_text || "";
+      chunkNum = s.index || (idx + 1);
+    }
+
+    const sourceId = "src_" + Math.random().toString(36).slice(2, 10);
+    sourceStore[sourceId] = {
+      filename,
+      chunkNum,
+      chunkText,
+    };
+
+    const icon = filename.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
+    return `<button type="button" class="source-tag clickable" onclick="openSourceModal('${sourceId}')" title="Click to inspect retrieved passage">${icon} ${filename} <span class="chunk-badge">#${chunkNum}</span></button>`;
   }).join("");
-  return `<div class="sources"><span class="source-label">📎 Sources:</span>${tags}</div>`;
+
+  return `<div class="sources"><span class="source-label">📎 Referenced Context:</span>${tags}</div>`;
 }
 
 // ── Send message with Live SSE Streaming ──
@@ -324,4 +348,66 @@ function handleKey(e) {
 function autoResize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 140) + "px";
+}
+
+// ── Source Inspector Modal Handlers ──
+let activeSnippetText = "";
+
+function openSourceModal(sourceId) {
+  const item = sourceStore[sourceId];
+  if (!item) return;
+
+  activeSnippetText = item.chunkText;
+  const filenameEl = document.getElementById("modal-filename");
+  const chunkBadgeEl = document.getElementById("modal-chunk-id");
+  const snippetEl = document.getElementById("modal-snippet");
+
+  if (filenameEl) filenameEl.textContent = item.filename;
+  if (chunkBadgeEl) chunkBadgeEl.textContent = `Passage #${item.chunkNum}`;
+  if (snippetEl) snippetEl.textContent = item.chunkText;
+
+  const copyBtn = document.getElementById("copy-btn");
+  if (copyBtn) {
+    copyBtn.innerHTML = "📋 Copy text";
+    copyBtn.classList.remove("copied");
+  }
+
+  const modal = document.getElementById("source-modal");
+  if (modal) modal.classList.add("open");
+}
+
+function closeSourceModal(e) {
+  if (e && e.target && e.target !== document.getElementById("source-modal") && !e.target.classList.contains("modal-close-btn")) {
+    return;
+  }
+  const modal = document.getElementById("source-modal");
+  if (modal) modal.classList.remove("open");
+}
+
+// Close modal on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const modal = document.getElementById("source-modal");
+    if (modal && modal.classList.contains("open")) {
+      modal.classList.remove("open");
+    }
+  }
+});
+
+async function copySourceSnippet() {
+  if (!activeSnippetText) return;
+  try {
+    await navigator.clipboard.writeText(activeSnippetText);
+    const copyBtn = document.getElementById("copy-btn");
+    if (copyBtn) {
+      copyBtn.innerHTML = "✓ Copied!";
+      copyBtn.classList.add("copied");
+      setTimeout(() => {
+        copyBtn.innerHTML = "📋 Copy text";
+        copyBtn.classList.remove("copied");
+      }, 2200);
+    }
+  } catch (err) {
+    console.error("Clipboard copy failed:", err);
+  }
 }

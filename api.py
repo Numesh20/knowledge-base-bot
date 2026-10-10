@@ -127,9 +127,22 @@ def retrieve(question, top_k=3):
         return [], []
     emb = get_embedding(question)
     results = collection.query(query_embeddings=[emb], n_results=min(top_k, chunk_count or 1))
-    chunks = results["documents"][0]
-    sources = list(set([m["source"] for m in results["metadatas"][0]]))
-    return chunks, sources
+    chunks = results["documents"][0] if results.get("documents") else []
+    metas = results["metadatas"][0] if results.get("metadatas") else []
+
+    source_details = []
+    for i, chunk_text in enumerate(chunks):
+        meta = metas[i] if i < len(metas) else {}
+        src = meta.get("source", "knowledge")
+        filename = os.path.basename(src)
+        source_details.append({
+            "source": src,
+            "filename": filename,
+            "chunk_text": chunk_text,
+            "index": i + 1
+        })
+
+    return chunks, source_details
 
 def build_prompt(question, context_chunks, history):
     """Build the prompt string — shared by streaming and non-streaming."""
