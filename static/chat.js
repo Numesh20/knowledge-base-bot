@@ -45,7 +45,28 @@ async function loadStats() {
   }
 }
 
-// ── Send message ──
+// ── Text Formatter (Markdown & Lists) ──
+function formatMessageText(text) {
+  if (!text) return "";
+  return text
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n\n/g, "<br/><br/>")
+    .replace(/\n/g, "<br/>")
+    .replace(/^\* (.+)/gm, "• $1");
+}
+
+// ── Render Source Chips ──
+function buildSourcesHTML(sources) {
+  if (!sources || sources.length === 0) return "";
+  const tags = sources.map(s => {
+    const name = s.split(/[\\/]/).pop();
+    return `<span class="source-tag">${name}</span>`;
+  }).join("");
+  return `<div class="sources"><span class="source-label">📎 Sources:</span>${tags}</div>`;
+}
+
+// ── Send message with Live SSE Streaming ──
 async function sendMessage() {
   const input = document.getElementById("user-input");
   const message = input.value.trim();
@@ -60,36 +81,119 @@ async function sendMessage() {
   input.value = "";
   autoResize(input);
 
-  // Disable send button
+  // Disable send button while streaming
   const btn = document.getElementById("send-btn");
   btn.disabled = true;
 
-  // Show typing indicator
-  const typingId = showTyping();
+  // Create live bot bubble
+  const container = document.getElementById("messages");
+  const botMsg = document.createElement("div");
+  botMsg.className = "message bot";
+  botMsg.innerHTML = `
+    <div class="avatar">🧠</div>
+    <div class="bubble">
+      <div class="bubble-content">
+        <div class="typing-indicator" style="padding:4px 0">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+      <div class="sources-container"></div>
+    </div>
+  `;
+  container.appendChild(botMsg);
+  container.scrollTop = container.scrollHeight;
+
+  const contentEl = botMsg.querySelector(".bubble-content");
+  const sourcesEl = botMsg.querySelector(".sources-container");
+
+  let fullText = "";
 
   try {
-    const res = await fetch(`${API}/chat`, {
+    const res = await fetch(`${API}/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
     });
 
-    const data = await res.json();
-    removeTyping(typingId);
+    if (!res.ok) {
+      throw new Error(`Server returned HTTP ${res.status}`);
+    }
 
-    // Add bot answer
-    addMessage("bot", data.answer, data.sources);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let hasReceivedFirstToken = false;
 
-    // Update chat count
-    document.getElementById("stat-chats").textContent = data.history_length;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop(); // keep partial event in buffer
+
+      for (const raw of events) {
+        const line = raw.trim();
+        if (!line.startsWith("data: ")) continue;
+
+        try {
+          const ev = JSON.parse(line.slice(6));
+
+          if (ev.type === "token") {
+            hasReceivedFirstToken = true;
+            fullText += ev.text;
+            contentEl.innerHTML = formatMessageText(fullText) + '<span class="streaming-cursor"></span>';
+            container.scrollTop = container.scrollHeight;
+
+          } else if (ev.type === "done") {
+            // Streaming complete
+            contentEl.innerHTML = formatMessageText(fullText || "No response generated.");
+            if (ev.sources && ev.sources.length > 0) {
+              sourcesEl.innerHTML = buildSourcesHTML(ev.sources);
+            }
+            if (ev.history_length !== undefined) {
+              document.getElementById("stat-chats").textContent = ev.history_length;
+            }
+            container.scrollTop = container.scrollHeight;
+
+          } else if (ev.type === "error") {
+            contentEl.innerHTML = formatMessageText(ev.text || "⚠️ An error occurred.");
+          }
+        } catch (parseErr) {
+          console.error("SSE parse error:", parseErr, line);
+        }
+      }
+    }
+
+    // Ensure cursor is removed even if done event was missed
+    if (contentEl.querySelector(".streaming-cursor")) {
+      contentEl.innerHTML = formatMessageText(fullText);
+    }
 
   } catch (err) {
-    removeTyping(typingId);
-    addMessage("bot", "⚠️ Connection error. Make sure the server is running (`py api.py`).", []);
+    console.warn("Streaming fetch failed, trying fallback /chat:", err);
+    // Fallback to standard /chat endpoint
+    try {
+      const fallbackRes = await fetch(`${API}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const data = await fallbackRes.json();
+      contentEl.innerHTML = formatMessageText(data.answer);
+      if (data.sources && data.sources.length > 0) {
+        sourcesEl.innerHTML = buildSourcesHTML(data.sources);
+      }
+      document.getElementById("stat-chats").textContent = data.history_length;
+    } catch (fallbackErr) {
+      contentEl.innerHTML = "⚠️ Connection error. Make sure the server is running (`py api.py`).";
+    }
+  } finally {
+    btn.disabled = false;
+    input.focus();
   }
-
-  btn.disabled = false;
-  input.focus();
 }
 
 // ── Quick prompt buttons ──
@@ -98,30 +202,15 @@ function sendQuick(text) {
   sendMessage();
 }
 
-// ── Add message bubble ──
+// ── Add static message bubble (for welcome/system/uploads) ──
 function addMessage(role, text, sources = []) {
   const container = document.getElementById("messages");
   const msg = document.createElement("div");
   msg.className = `message ${role}`;
 
   const avatar = role === "bot" ? "🧠" : "👤";
-
-  // Format text — convert **bold** and bullet points
-  let formatted = text
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\n\n/g, "<br/><br/>")
-    .replace(/\n/g, "<br/>")
-    .replace(/^\* (.+)/gm, "• $1");
-
-  // Sources HTML
-  let sourcesHTML = "";
-  if (sources && sources.length > 0) {
-    const tags = sources.map(s => {
-      const name = s.split(/[\\/]/).pop();  // filename only
-      return `<span class="source-tag">${name}</span>`;
-    }).join("");
-    sourcesHTML = `<div class="sources"><span class="source-label">📎 Sources:</span>${tags}</div>`;
-  }
+  const formatted = formatMessageText(text);
+  const sourcesHTML = buildSourcesHTML(sources);
 
   msg.innerHTML = `
     <div class="avatar">${avatar}</div>

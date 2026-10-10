@@ -31,10 +31,11 @@ import chromadb
 from google import genai
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from pypdf import PdfReader
 import uvicorn
+import json
 
 # ── Gemini client ──
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -130,22 +131,21 @@ def retrieve(question, top_k=3):
     sources = list(set([m["source"] for m in results["metadatas"][0]]))
     return chunks, sources
 
-def generate_answer(question, context_chunks, history):
+def build_prompt(question, context_chunks, history):
+    """Build the prompt string — shared by streaming and non-streaming."""
     context = "\n\n".join(context_chunks)
-
-    # Build conversation history string
     history_str = ""
-    for turn in history[-4:]:  # last 4 exchanges
+    for turn in history[-4:]:
         history_str += f"User: {turn['question']}\nBot: {turn['answer']}\n\n"
 
-    prompt = f"""You are a helpful and friendly knowledge base assistant.
+    history_section = f"=== PREVIOUS CONVERSATION ===\n{history_str}\n" if history_str else ""
+
+    return f"""You are a helpful and friendly knowledge base assistant.
 Use the KNOWLEDGE BASE CONTEXT below to answer the user's question accurately.
 If the answer is not in the context, say: "I don't have that information in my knowledge base."
 Keep answers clear and concise.
 
-=== PREVIOUS CONVERSATION ===
-{history_str}
-=== KNOWLEDGE BASE CONTEXT ===
+{history_section}=== KNOWLEDGE BASE CONTEXT ===
 {context}
 ==============================
 
@@ -153,11 +153,14 @@ Current Question: {question}
 
 Answer:"""
 
+def generate_answer(question, context_chunks, history):
+    prompt = build_prompt(question, context_chunks, history)
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=prompt,
     )
     return response.text.strip()
+
 
 # ── FastAPI App ──
 app = FastAPI(title="KnowledgeBot API")
@@ -178,24 +181,69 @@ class ChatResponse(BaseModel):
     sources: list
     history_length: int
 
-# ── Chat endpoint ──
+# ── Chat endpoint (non-streaming fallback) ──
 @app.post("/chat")
 def chat(req: ChatRequest):
     global chat_history
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Empty message")
     if chunk_count == 0:
-        return JSONResponse({"answer": "No knowledge loaded yet! Upload a .txt file first using the panel on the left.", "sources": [], "history_length": 0})
+        return JSONResponse({"answer": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left.", "sources": [], "history_length": 0})
 
     chunks, sources = retrieve(req.message)
     answer = generate_answer(req.message, chunks, chat_history)
     chat_history.append({"question": req.message, "answer": answer})
-
-    # Keep history to last 20
     if len(chat_history) > 20:
         chat_history = chat_history[-20:]
-
     return {"answer": answer, "sources": sources, "history_length": len(chat_history)}
+
+# ── Streaming chat endpoint (Server-Sent Events) ──
+@app.post("/stream")
+def stream_chat(req: ChatRequest):
+    global chat_history
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Empty message")
+
+    if chunk_count == 0:
+        def no_kb():
+            data = {"type": "token", "text": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left."}
+            yield f"data: {json.dumps(data)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'sources': [], 'history_length': 0})}\n\n"
+        return StreamingResponse(no_kb(), media_type="text/event-stream")
+
+    # Retrieve context before streaming
+    chunks, sources = retrieve(req.message)
+    prompt = build_prompt(req.message, chunks, chat_history)
+
+    def event_stream():
+        full_answer = ""
+        try:
+            # Use Gemini streaming
+            for chunk in client.models.generate_content_stream(
+                model="gemini-3.6-flash",
+                contents=prompt,
+            ):
+                text_piece = chunk.text or ""
+                if text_piece:
+                    full_answer += text_piece
+                    data = {"type": "token", "text": text_piece}
+                    yield f"data: {json.dumps(data)}\n\n"
+
+            # Save to history
+            chat_history.append({"question": req.message, "answer": full_answer.strip()})
+            if len(chat_history) > 20:
+                chat_history[:] = chat_history[-20:]
+
+            # Send done event with sources
+            done_data = {"type": "done", "sources": sources, "history_length": len(chat_history)}
+            yield f"data: {json.dumps(done_data)}\n\n"
+
+        except Exception as e:
+            err_data = {"type": "error", "text": f"⚠️ Error: {str(e)}"}
+            yield f"data: {json.dumps(err_data)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 # ── Upload endpoint ──
 @app.post("/upload")
