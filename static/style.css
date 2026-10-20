@@ -79,8 +79,21 @@ body { display: flex; }
 .upload-status.error { color: #f87171; }
 .upload-status.loading { color: var(--text3); }
 
+.sidebar-actions {
+  margin-top: auto; display: flex; flex-direction: column; gap: 8px;
+}
+
+.export-btn {
+  width: 100%;
+  background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.22);
+  color: var(--purple2); padding: 9px; border-radius: var(--radius);
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  font-family: 'Inter', sans-serif; transition: all 0.2s ease;
+}
+.export-btn:hover { background: rgba(139,92,246,0.18); border-color: var(--purple); color: #fff; }
+
 .clear-btn {
-  margin-top: auto; width: 100%;
+  width: 100%;
   background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2);
   color: #f87171; padding: 9px; border-radius: var(--radius);
   font-size: 0.82rem; font-weight: 600; cursor: pointer;
@@ -332,3 +345,24 @@ body { display: flex; }
   white-space: pre-wrap; word-break: break-word; max-height: 380px;
   overflow-y: auto; user-select: text;
 }
+
+/* ── EXPORT MODAL ── */
+.export-modal-card { max-width: 480px; }
+.export-modal-body { padding: 20px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.export-desc { font-size: 0.87rem; color: var(--text2); margin: 0; }
+.export-options { display: flex; flex-direction: column; gap: 10px; }
+.export-format-btn {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: var(--radius);
+  background: var(--bg3); border: 1.5px solid var(--border2);
+  cursor: pointer; text-align: left; transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif; color: var(--text);
+}
+.export-format-btn:hover {
+  border-color: var(--purple); background: rgba(139,92,246,0.1);
+  transform: translateY(-1px); box-shadow: 0 4px 14px rgba(139,92,246,0.2);
+}
+.export-fmt-icon { font-size: 1.6rem; flex-shrink: 0; }
+.export-fmt-title { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; }
+.export-fmt-desc { font-size: 0.78rem; color: var(--text2); }
+

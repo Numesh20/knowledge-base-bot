@@ -411,3 +411,134 @@ async function copySourceSnippet() {
     console.error("Clipboard copy failed:", err);
   }
 }
+
+// ── Export Chat Modal ──
+function openExportModal() {
+  const messages = document.querySelectorAll("#messages .message");
+  const count = [...messages].filter(m => !m.querySelector(".typing-indicator")).length;
+
+  const badge = document.getElementById("export-msg-count");
+  if (badge) badge.textContent = `${count} message${count !== 1 ? "s" : ""}`;
+
+  const modal = document.getElementById("export-modal");
+  if (modal) modal.classList.add("open");
+}
+
+function closeExportModal(e) {
+  if (e && e.target !== document.getElementById("export-modal")) return;
+  const modal = document.getElementById("export-modal");
+  if (modal) modal.classList.remove("open");
+}
+
+// ── Scrape visible chat messages into structured log ──
+function scrapeChat() {
+  const msgs = document.querySelectorAll("#messages .message");
+  const log = [];
+  msgs.forEach(msg => {
+    // Skip typing indicators and welcome screen
+    if (msg.querySelector(".typing-indicator") || msg.querySelector(".welcome-screen")) return;
+
+    const isBot = msg.classList.contains("bot");
+    const role = isBot ? "bot" : "user";
+
+    const contentEl = msg.querySelector(".bubble-content");
+    const text = contentEl ? (contentEl.innerText || contentEl.textContent || "").trim() : "";
+    if (!text) return;
+
+    // Collect sources from clickable buttons inside the message
+    const sources = [];
+    msg.querySelectorAll(".source-tag").forEach(tag => {
+      const filename = tag.textContent.replace(/#\d+/g, "").trim();
+      if (filename && !sources.includes(filename)) sources.push(filename);
+    });
+
+    log.push({ role, text, sources });
+  });
+  return log;
+}
+
+// ── Build Markdown export string ──
+function buildMarkdownExport(log) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  let md = `# 🧠 KnowledgeBot Conversation\n\n`;
+  md += `> **Exported:** ${dateStr} at ${timeStr}  \n`;
+  md += `> **Powered by:** Gemini AI + ChromaDB RAG\n\n`;
+  md += `---\n\n`;
+
+  log.forEach((entry, i) => {
+    if (entry.role === "user") {
+      md += `### 👤 You\n\n${entry.text}\n\n`;
+    } else {
+      md += `### 🧠 KnowledgeBot\n\n${entry.text}\n\n`;
+      if (entry.sources.length > 0) {
+        md += `> 📎 **Sources:** ${entry.sources.map(s => `\`${s}\``).join(", ")}\n\n`;
+      }
+    }
+    if (i < log.length - 1) md += `---\n\n`;
+  });
+
+  return md;
+}
+
+// ── Build Plain Text export string ──
+function buildTxtExport(log) {
+  const now = new Date();
+  const dateStr = now.toLocaleString("en-US");
+
+  let txt = `KNOWLEDGEBOT CONVERSATION\n`;
+  txt += `Exported: ${dateStr}\n`;
+  txt += `${"=".repeat(50)}\n\n`;
+
+  log.forEach(entry => {
+    const role = entry.role === "user" ? "YOU" : "KNOWLEDGEBOT";
+    txt += `[${role}]\n${entry.text}\n`;
+    if (entry.sources.length > 0) {
+      txt += `Sources: ${entry.sources.join(", ")}\n`;
+    }
+    txt += `\n${"-".repeat(40)}\n\n`;
+  });
+
+  return txt;
+}
+
+// ── Trigger file download ──
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Export chat in chosen format ──
+function exportChat(format) {
+  const log = scrapeChat();
+
+  if (log.length === 0) {
+    alert("No conversation to export yet! Ask the bot a question first.");
+    return;
+  }
+
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10);
+
+  if (format === "md") {
+    const content = buildMarkdownExport(log);
+    downloadFile(content, `knowledgebot-${datePart}.md`, "text/markdown;charset=utf-8");
+  } else {
+    const content = buildTxtExport(log);
+    downloadFile(content, `knowledgebot-${datePart}.txt`, "text/plain;charset=utf-8");
+  }
+
+  // Close modal after download
+  const modal = document.getElementById("export-modal");
+  if (modal) modal.classList.remove("open");
+}
+

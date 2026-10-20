@@ -60,8 +60,11 @@
     <div class="upload-status" id="upload-status"></div>
   </div>
 
-  <!-- Clear -->
-  <button class="clear-btn" onclick="clearHistory()">🗑️ Clear Chat History</button>
+  <!-- Sidebar action buttons -->
+  <div class="sidebar-actions">
+    <button class="export-btn" onclick="openExportModal()" title="Download conversation">⬇️ Export Chat</button>
+    <button class="clear-btn" onclick="clearHistory()">🗑️ Clear History</button>
+  </div>
 </aside>
 
 <!-- ── MAIN CHAT ── -->
@@ -130,6 +133,41 @@
         </button>
       </div>
       <div class="snippet-box" id="modal-snippet"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXPORT FORMAT PICKER MODAL ── -->
+<div class="modal-overlay" id="export-modal" onclick="closeExportModal(event)">
+  <div class="modal-card export-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon">⬇️</span>
+        <div>
+          <h3>Export Conversation</h3>
+          <span class="modal-badge" id="export-msg-count">0 messages</span>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="closeExportModal()" title="Close">✕</button>
+    </div>
+    <div class="modal-body export-modal-body">
+      <p class="export-desc">Choose a format to download your conversation:</p>
+      <div class="export-options">
+        <button class="export-format-btn" id="export-md-btn" onclick="exportChat('md')">
+          <span class="export-fmt-icon">📝</span>
+          <div>
+            <div class="export-fmt-title">Markdown (.md)</div>
+            <div class="export-fmt-desc">With formatting, headers, and source citations</div>
+          </div>
+        </button>
+        <button class="export-format-btn" id="export-txt-btn" onclick="exportChat('txt')">
+          <span class="export-fmt-icon">📄</span>
+          <div>
+            <div class="export-fmt-title">Plain Text (.txt)</div>
+            <div class="export-fmt-desc">Simple readable text, no formatting</div>
+          </div>
+        </button>
+      </div>
     </div>
   </div>
 </div>
