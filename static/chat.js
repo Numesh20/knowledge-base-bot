@@ -45,15 +45,148 @@ async function loadStats() {
   }
 }
 
-// ── Text Formatter (Markdown & Lists) ──
+// ── Full Markdown Renderer ──
 function formatMessageText(text) {
   if (!text) return "";
+
+  // Escape HTML entities first (safety)
+  const escape = s => s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Split into lines for block-level parsing
+  const lines = text.split("\n");
+  let html = "";
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // ── Fenced code block (``` ... ```) ──
+    if (line.trimStart().startsWith("```")) {
+      const lang = line.trim().slice(3).trim();
+      let code = "";
+      i++;
+      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+        code += escape(lines[i]) + "\n";
+        i++;
+      }
+      html += `<div class="md-code-block"><div class="md-code-header"><span class="md-code-lang">${lang || "code"}</span><button class="md-copy-code" onclick="copyCodeBlock(this)">📋 Copy</button></div><pre><code>${code.trimEnd()}</code></pre></div>`;
+      i++; // skip closing ```
+      continue;
+    }
+
+    // ── Heading 1 ──
+    if (/^# /.test(line)) {
+      html += `<h1 class="md-h1">${renderInline(line.slice(2))}</h1>`;
+      i++; continue;
+    }
+    // ── Heading 2 ──
+    if (/^## /.test(line)) {
+      html += `<h2 class="md-h2">${renderInline(line.slice(3))}</h2>`;
+      i++; continue;
+    }
+    // ── Heading 3 ──
+    if (/^### /.test(line)) {
+      html += `<h3 class="md-h3">${renderInline(line.slice(4))}</h3>`;
+      i++; continue;
+    }
+    // ── Heading 4 ──
+    if (/^#### /.test(line)) {
+      html += `<h4 class="md-h4">${renderInline(line.slice(5))}</h4>`;
+      i++; continue;
+    }
+
+    // ── Blockquote ──
+    if (/^> /.test(line)) {
+      let quote = "";
+      while (i < lines.length && /^> /.test(lines[i])) {
+        quote += renderInline(lines[i].slice(2)) + "<br/>";
+        i++;
+      }
+      html += `<blockquote class="md-blockquote">${quote}</blockquote>`;
+      continue;
+    }
+
+    // ── Horizontal rule ──
+    if (/^(---|\*\*\*|___)$/.test(line.trim())) {
+      html += `<hr class="md-hr"/>`;
+      i++; continue;
+    }
+
+    // ── Unordered list ──
+    if (/^[\*\-] /.test(line)) {
+      html += `<ul class="md-ul">`;
+      while (i < lines.length && /^[\*\-] /.test(lines[i])) {
+        html += `<li>${renderInline(lines[i].slice(2))}</li>`;
+        i++;
+      }
+      html += `</ul>`;
+      continue;
+    }
+
+    // ── Ordered list ──
+    if (/^\d+\. /.test(line)) {
+      html += `<ol class="md-ol">`;
+      while (i < lines.length && /^\d+\. /.test(lines[i])) {
+        html += `<li>${renderInline(lines[i].replace(/^\d+\. /, ""))}</li>`;
+        i++;
+      }
+      html += `</ol>`;
+      continue;
+    }
+
+    // ── Table ──
+    if (/\|/.test(line) && i + 1 < lines.length && /^\|?[\s\-:|]+\|/.test(lines[i + 1])) {
+      const headers = line.split("|").filter(c => c.trim()).map(c => `<th>${renderInline(c.trim())}</th>`).join("");
+      i += 2; // skip header + separator
+      let rows = "";
+      while (i < lines.length && /\|/.test(lines[i])) {
+        const cells = lines[i].split("|").filter(c => c.trim()).map(c => `<td>${renderInline(c.trim())}</td>`).join("");
+        rows += `<tr>${cells}</tr>`;
+        i++;
+      }
+      html += `<div class="md-table-wrap"><table class="md-table"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      continue;
+    }
+
+    // ── Empty line → paragraph break ──
+    if (line.trim() === "") {
+      html += `<div class="md-spacer"></div>`;
+      i++; continue;
+    }
+
+    // ── Regular paragraph ──
+    html += `<p class="md-p">${renderInline(line)}</p>`;
+    i++;
+  }
+
+  return html;
+}
+
+// ── Inline Markdown (bold, italic, code, links) ──
+function renderInline(text) {
+  if (!text) return "";
   return text
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\n\n/g, "<br/><br/>")
-    .replace(/\n/g, "<br/>")
-    .replace(/^\* (.+)/gm, "• $1");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/`([^`]+)`/g, `<code class="md-inline-code">$1</code>`)
+    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/_(.+?)_/g, "<em>$1</em>")
+    .replace(/~~(.+?)~~/g, "<del>$1</del>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a href="$2" target="_blank" rel="noopener" class="md-link">$1</a>`);
+}
+
+// ── Copy code block button ──
+function copyCodeBlock(btn) {
+  const code = btn.closest(".md-code-block").querySelector("code").innerText;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = "✓ Copied!";
+    btn.style.color = "#4ade80";
+    setTimeout(() => { btn.textContent = "📋 Copy"; btn.style.color = ""; }, 2000);
+  });
 }
 
 // ── Global Source Cache ──
