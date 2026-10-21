@@ -186,6 +186,13 @@ def generate_answer(question, context_chunks, history):
 # ── FastAPI App ──
 app = FastAPI(title="KnowledgeBot API")
 
+@app.on_event("startup")
+def startup_event():
+    """Build knowledge base automatically on server startup (local & cloud)."""
+    global collection
+    if collection is None:
+        build_kb()
+
 # Serve static files (HTML/CSS/JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -357,9 +364,9 @@ def clear_history():
 
 # ── Run server ──
 if __name__ == "__main__":
-    build_kb()
+    port = int(os.environ.get("PORT", 8000))
     print("=" * 50)
     print("  KnowledgeBot Web UI is running!")
-    print("  Open your browser: http://localhost:8000")
+    print(f"  Open your browser: http://localhost:{port}")
     print("=" * 50)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
