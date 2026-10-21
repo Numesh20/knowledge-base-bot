@@ -283,6 +283,60 @@ async def upload_file(file: UploadFile = File(...)):
     build_kb()
     return {"message": f"'{filename}' uploaded and learned!", "docs": doc_count, "chunks": chunk_count}
 
+# ── Delete document endpoints ──
+def remove_document_internal(filename: str):
+    global doc_count, chunk_count
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join("knowledge", safe_filename)
+
+    file_existed = False
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        file_existed = True
+
+    deleted_chunks = 0
+    if collection:
+        all_data = collection.get()
+        ids_to_delete = []
+        for doc_id, meta in zip(all_data.get("ids", []), all_data.get("metadatas", [])):
+            src = meta.get("source", "") if meta else ""
+            if os.path.basename(src) == safe_filename or safe_filename in doc_id:
+                ids_to_delete.append(doc_id)
+        if ids_to_delete:
+            collection.delete(ids=ids_to_delete)
+            deleted_chunks = len(ids_to_delete)
+        chunk_count = collection.count()
+
+    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    doc_count = len(all_files)
+
+    if not file_existed and deleted_chunks == 0:
+        raise HTTPException(status_code=404, detail=f"Document '{safe_filename}' not found")
+
+    return {
+        "message": f"'{safe_filename}' deleted successfully ({deleted_chunks} chunks removed)",
+        "filename": safe_filename,
+        "deleted_chunks": deleted_chunks,
+        "docs": doc_count,
+        "chunks": chunk_count,
+        "files": sorted([Path(f).name for f in all_files])
+    }
+
+@app.delete("/documents/{filename}")
+def delete_document(filename: str):
+    return remove_document_internal(filename)
+
+@app.delete("/api/documents/{filename}")
+def delete_document_api(filename: str):
+    return remove_document_internal(filename)
+
+class DeleteRequest(BaseModel):
+    filename: str
+
+@app.post("/delete-document")
+def delete_document_post(req: DeleteRequest):
+    return remove_document_internal(req.filename)
+
 # ── Stats endpoint ──
 @app.get("/stats")
 def stats():

@@ -139,6 +139,36 @@ def build_knowledge_base():
     print(f"\n[READY] Knowledge base built! ({len(files)} files, {total_chunks} chunks)\n")
     return collection, total_chunks
 
+# ── Delete document from disk and ChromaDB ──
+def delete_document(filename, db_path="./chroma_db"):
+    """Delete a document from knowledge/ and purge its chunks from ChromaDB."""
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join("knowledge", safe_filename)
+
+    file_existed = False
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        file_existed = True
+
+    db = chromadb.PersistentClient(path=db_path)
+    try:
+        col = db.get_collection("knowledge_base")
+        all_data = col.get()
+        ids_to_delete = []
+        for doc_id, meta in zip(all_data.get("ids", []), all_data.get("metadatas", [])):
+            src = meta.get("source", "") if meta else ""
+            if os.path.basename(src) == safe_filename or safe_filename in doc_id:
+                ids_to_delete.append(doc_id)
+        if ids_to_delete:
+            col.delete(ids=ids_to_delete)
+        deleted_count = len(ids_to_delete)
+    except Exception as e:
+        deleted_count = 0
+        print(f"[WARN] ChromaDB error during deletion: {e}")
+
+    print(f"[DELETED] '{safe_filename}' (file removed: {file_existed}, {deleted_count} chunks purged)")
+    return file_existed or deleted_count > 0
+
 # ── Retrieve relevant chunks ──
 def retrieve(collection, question, top_k=3):
     """Find the most relevant chunks for a question."""

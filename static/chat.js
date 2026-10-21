@@ -36,7 +36,11 @@ async function loadStats() {
     } else {
       filesList.innerHTML = data.files.map(f => {
         const icon = f.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
-        return `<div class="file-tag"><span>${icon} ${f}</span></div>`;
+        const safeName = f.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        return `<div class="file-tag">
+          <span title="${f}">${icon} ${f}</span>
+          <button class="delete-doc-btn" onclick="openDeleteModal('${safeName}')" title="Delete '${safeName}'">✕</button>
+        </div>`;
       }).join("");
     }
   } catch (err) {
@@ -517,13 +521,15 @@ function closeSourceModal(e) {
   if (modal) modal.classList.remove("open");
 }
 
-// Close modal on Escape key
+// Close any open modal on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    const modal = document.getElementById("source-modal");
-    if (modal && modal.classList.contains("open")) {
-      modal.classList.remove("open");
-    }
+    ["source-modal", "export-modal", "delete-modal"].forEach(id => {
+      const modal = document.getElementById(id);
+      if (modal && modal.classList.contains("open")) {
+        modal.classList.remove("open");
+      }
+    });
   }
 });
 
@@ -674,4 +680,81 @@ function exportChat(format) {
   const modal = document.getElementById("export-modal");
   if (modal) modal.classList.remove("open");
 }
+
+// ── Delete Document Modal & Logic ──
+let filePendingDelete = null;
+
+function openDeleteModal(filename) {
+  filePendingDelete = filename;
+  const nameEl = document.getElementById("delete-doc-name");
+  const valEl = document.getElementById("delete-file-val");
+  const btn = document.getElementById("confirm-delete-btn");
+
+  if (nameEl) nameEl.textContent = filename;
+  if (valEl) valEl.textContent = `knowledge/${filename}`;
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = "🗑️ Delete Document";
+  }
+
+  const modal = document.getElementById("delete-modal");
+  if (modal) modal.classList.add("open");
+}
+
+function closeDeleteModal(e) {
+  if (e && e.target !== document.getElementById("delete-modal")) return;
+  const modal = document.getElementById("delete-modal");
+  if (modal) modal.classList.remove("open");
+  filePendingDelete = null;
+}
+
+async function executeDeleteDocument() {
+  if (!filePendingDelete) return;
+  const filename = filePendingDelete;
+  const btn = document.getElementById("confirm-delete-btn");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = "⏳ Deleting...";
+  }
+
+  try {
+    const res = await fetch(`${API}/documents/${encodeURIComponent(filename)}`, {
+      method: "DELETE"
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to delete document");
+    }
+
+    closeDeleteModal();
+    showToast(`Deleted '${filename}' (${data.deleted_chunks} vectors purged)`, "success");
+    await loadStats();
+  } catch (err) {
+    console.error("Delete error:", err);
+    showToast(`Error: ${err.message}`, "error");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "🗑️ Try Again";
+    }
+  }
+}
+
+// ── Toast Notification Helper ──
+function showToast(message, type = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  const icon = type === "success" ? "✓" : "⚠️";
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3300);
+}
+
 

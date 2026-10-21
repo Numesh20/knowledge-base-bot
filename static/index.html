@@ -172,6 +172,44 @@
   </div>
 </div>
 
+<!-- ── DELETE DOCUMENT MODAL ── -->
+<div class="modal-overlay" id="delete-modal" onclick="closeDeleteModal(event)">
+  <div class="modal-card delete-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon delete-icon">🗑️</span>
+        <div>
+          <h3>Delete Document</h3>
+          <span class="modal-badge danger-badge">Permanent Action</span>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="closeDeleteModal()" title="Close">✕</button>
+    </div>
+    <div class="modal-body delete-modal-body">
+      <p class="delete-warning-text">
+        Are you sure you want to remove <strong id="delete-doc-name">document.pdf</strong> from your knowledge base?
+      </p>
+      <div class="delete-info-box">
+        <div class="delete-info-item">
+          <span class="delete-info-label">📁 File Location:</span>
+          <span class="delete-info-val" id="delete-file-val">knowledge/document.pdf</span>
+        </div>
+        <div class="delete-info-item">
+          <span class="delete-info-label">🧠 ChromaDB:</span>
+          <span class="delete-info-val">All chunk vector embeddings will be purged</span>
+        </div>
+      </div>
+      <div class="delete-modal-actions">
+        <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn-danger" id="confirm-delete-btn" onclick="executeDeleteDocument()">🗑️ Delete Document</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST NOTIFICATION ── -->
+<div id="toast-container" class="toast-container"></div>
+
 <script src="/static/chat.js"></script>
 </body>
 </html>
