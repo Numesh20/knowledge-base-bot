@@ -77,12 +77,20 @@ def chunk_text(text, chunk_size=400, overlap=50):
         i += chunk_size - overlap
     return chunks
 
-def get_embedding(text):
-    response = client.models.embed_content(
-        model="gemini-embedding-001",
-        contents=text,
-    )
-    return response.embeddings[0].values
+def get_embedding(text, max_retries=3):
+    import time
+    for attempt in range(max_retries):
+        try:
+            response = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=text,
+            )
+            return response.embeddings[0].values
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"      [RETRY] Embedding call failed ({e}). Retrying in {1.5 * (attempt + 1):.1f}s...")
+            time.sleep(1.5 * (attempt + 1))
 
 def build_kb():
     global collection, doc_count, chunk_count

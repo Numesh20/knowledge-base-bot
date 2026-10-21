@@ -69,13 +69,21 @@ def chunk_text(text, chunk_size=400, overlap=50):
     return chunks
 
 # ── Helper: get embedding from Gemini ──
-def get_embedding(text):
-    """Convert text into a list of numbers (vector) using Gemini."""
-    response = client.models.embed_content(
-        model="gemini-embedding-001",
-        contents=text,
-    )
-    return response.embeddings[0].values
+def get_embedding(text, max_retries=3):
+    """Convert text into a list of numbers (vector) using Gemini with retry logic."""
+    import time
+    for attempt in range(max_retries):
+        try:
+            response = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=text,
+            )
+            return response.embeddings[0].values
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"      [RETRY] Embedding call failed ({e}). Retrying in {1.5 * (attempt + 1):.1f}s...")
+            time.sleep(1.5 * (attempt + 1))
 
 # ── Build the Knowledge Base ──
 def build_knowledge_base():
