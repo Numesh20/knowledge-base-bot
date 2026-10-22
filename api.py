@@ -92,16 +92,29 @@ def get_embedding(text, max_retries=3):
             print(f"      [RETRY] Embedding call failed ({e}). Retrying in {1.5 * (attempt + 1):.1f}s...")
             time.sleep(1.5 * (attempt + 1))
 
-def build_kb():
+def build_kb(force_rebuild=False):
     global collection, doc_count, chunk_count
-    print("\n[...] Building knowledge base...")
+    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    doc_count = len(all_files)
+
+    if not force_rebuild:
+        try:
+            collection = db.get_collection("knowledge_base")
+            chunk_count = collection.count()
+            if chunk_count > 0:
+                print(f"[READY] Knowledge base loaded from disk! ({doc_count} files, {chunk_count} chunks)\n")
+                return
+        except Exception:
+            pass
+
+    print("\n[...] Building knowledge base from scratch...")
     try:
         db.delete_collection("knowledge_base")
     except Exception:
         pass
     collection = db.create_collection("knowledge_base")
 
-    files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    files = all_files
     doc_count = len(files)
     chunk_count = 0
 
