@@ -265,6 +265,9 @@ async function sendMessage() {
   const message = input.value.trim();
   if (!message) return;
 
+  // Stop voice recording if active
+  stopVoiceInput();
+
   // Hide welcome screen
   const welcome = document.getElementById("welcome");
   if (welcome) welcome.remove();
@@ -788,5 +791,129 @@ function showToast(message, type = "success") {
     toast.remove();
   }, 3300);
 }
+
+// ── Voice Input (Speech-to-Text) ──
+let speechRecognizer = null;
+let isRecording = false;
+
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-US";
+
+  let finalTranscript = "";
+
+  rec.onstart = () => {
+    isRecording = true;
+    updateVoiceUI(true, "Listening... Speak your question");
+  };
+
+  rec.onresult = (event) => {
+    let interim = "";
+    const input = document.getElementById("user-input");
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript + " ";
+      } else {
+        interim += transcript;
+      }
+    }
+
+    const currentText = (finalTranscript + interim).trim();
+    if (input) {
+      input.value = currentText;
+      autoResize(input);
+    }
+  };
+
+  rec.onerror = (event) => {
+    console.warn("Speech recognition error:", event.error);
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      showToast("Microphone permission denied. Allow mic access in your browser settings.", "error");
+    } else if (event.error === "no-speech") {
+      // Periodic no-speech is normal, let it stay active
+    } else {
+      showToast(`Voice error: ${event.error}`, "error");
+    }
+    stopVoiceInput();
+  };
+
+  rec.onend = () => {
+    // If still marked as recording, stop cleanly
+    stopVoiceInput();
+  };
+
+  return rec;
+}
+
+function toggleVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast("Speech recognition is not supported in this browser. Please use Chrome or Edge.", "error");
+    return;
+  }
+
+  if (isRecording) {
+    stopVoiceInput();
+  } else {
+    startVoiceInput();
+  }
+}
+
+function startVoiceInput() {
+  const input = document.getElementById("user-input");
+  if (!speechRecognizer) {
+    speechRecognizer = initSpeechRecognition();
+  }
+  if (!speechRecognizer) return;
+
+  try {
+    speechRecognizer.start();
+  } catch (err) {
+    console.warn("Could not start speech recognition:", err);
+    try {
+      speechRecognizer.stop();
+      setTimeout(() => speechRecognizer.start(), 250);
+    } catch (e) {}
+  }
+}
+
+function stopVoiceInput() {
+  if (speechRecognizer && isRecording) {
+    try {
+      speechRecognizer.stop();
+    } catch (e) {}
+  }
+  isRecording = false;
+  updateVoiceUI(false);
+}
+
+function updateVoiceUI(recording, statusText = "") {
+  const btn = document.getElementById("mic-btn");
+  const bar = document.getElementById("voice-status");
+  const textEl = document.getElementById("voice-status-text");
+
+  if (btn) {
+    if (recording) {
+      btn.classList.add("recording");
+      btn.title = "Click to stop listening";
+    } else {
+      btn.classList.remove("recording");
+      btn.title = "Voice input — Speak your question";
+    }
+  }
+
+  if (bar) {
+    bar.style.display = recording ? "flex" : "none";
+    if (textEl && statusText) textEl.textContent = statusText;
+  }
+}
+
 
 
