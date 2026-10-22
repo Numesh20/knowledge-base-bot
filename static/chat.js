@@ -2,8 +2,40 @@
 
 const API = "";  // same origin
 
+// ── Theme Switcher ──
+function initTheme() {
+  const saved = localStorage.getItem("kb_theme");
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = saved || (prefersDark ? "dark" : "dark");
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("kb_theme", theme);
+
+  const icon = document.getElementById("theme-icon");
+  const label = document.getElementById("theme-label");
+
+  if (theme === "light") {
+    if (icon) icon.textContent = "🌙";
+    if (label) label.textContent = "Dark";
+  } else {
+    if (icon) icon.textContent = "☀️";
+    if (label) label.textContent = "Light";
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "light" ? "dark" : "light";
+  applyTheme(next);
+  showToast(`Switched to ${next === "light" ? "Light" : "Dark"} mode`, "success");
+}
+
 // ── Init ──
 window.onload = () => {
+  initTheme();
   loadStats();
   setInterval(loadStats, 10000);  // refresh stats every 10s
 };
