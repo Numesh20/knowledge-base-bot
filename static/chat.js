@@ -33,6 +33,56 @@ function toggleTheme() {
   showToast(`Switched to ${next === "light" ? "Light" : "Dark"} mode`, "success");
 }
 
+// ── Multilingual Support ──
+let currentLanguage = localStorage.getItem("kb_lang") || "auto";
+
+const LANG_VOICE_MAP = {
+  "auto": "en-US",
+  "en": "en-US",
+  "si": "si-LK",
+  "ta": "ta-IN",
+  "hi": "hi-IN",
+  "es": "es-ES",
+  "fr": "fr-FR",
+  "de": "de-DE",
+  "ja": "ja-JP",
+  "zh": "zh-CN",
+  "ar": "ar-SA"
+};
+
+const LANG_DISPLAY_NAMES = {
+  "auto": "Auto-Detect",
+  "en": "English",
+  "si": "Sinhala (සිංහල)",
+  "ta": "Tamil (தமிழ்)",
+  "hi": "Hindi (हिन्दी)",
+  "es": "Spanish (Español)",
+  "fr": "French (Français)",
+  "de": "German (Deutsch)",
+  "ja": "Japanese (日本語)",
+  "zh": "Chinese (中文)",
+  "ar": "Arabic (العربية)"
+};
+
+function initLanguage() {
+  const select = document.getElementById("lang-select");
+  if (select) {
+    select.value = currentLanguage;
+  }
+}
+
+function changeLanguage(code) {
+  currentLanguage = code || "auto";
+  localStorage.setItem("kb_lang", currentLanguage);
+
+  if (speechRecognizer) {
+    speechRecognizer.lang = LANG_VOICE_MAP[currentLanguage] || "en-US";
+  }
+
+  const name = LANG_DISPLAY_NAMES[currentLanguage] || currentLanguage;
+  showToast(`Language set to ${name}`, "success");
+}
+
 // ── Multi-Chat Sessions ──
 let chatSessions = [];
 let currentSessionId = null;
@@ -231,6 +281,7 @@ function appendMessageToActiveSession(role, text, sources = []) {
 // ── Init ──
 window.onload = () => {
   initTheme();
+  initLanguage();
   initChatSessions();
   loadStats();
   setInterval(loadStats, 10000);  // refresh stats every 10s
@@ -510,7 +561,7 @@ async function sendMessage() {
     const res = await fetch(`${API}/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, language: currentLanguage }),
     });
 
     if (!res.ok) {
@@ -576,7 +627,7 @@ async function sendMessage() {
       const fallbackRes = await fetch(`${API}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, language: currentLanguage }),
       });
       const data = await fallbackRes.json();
       contentEl.innerHTML = formatMessageText(data.answer);
@@ -1011,7 +1062,7 @@ function initSpeechRecognition() {
   const rec = new SpeechRecognition();
   rec.continuous = true;
   rec.interimResults = true;
-  rec.lang = "en-US";
+  rec.lang = LANG_VOICE_MAP[currentLanguage] || "en-US";
 
   let finalTranscript = "";
 

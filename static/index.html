@@ -95,7 +95,22 @@
       <span id="header-status">Loading knowledge base...</span>
     </div>
     <div class="header-right">
-      <span class="header-hint">Ask anything about your documents</span>
+      <div class="lang-selector-wrap" title="Response & Voice Language">
+        <span class="lang-icon">🌐</span>
+        <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)" aria-label="Select Language">
+          <option value="auto">🌐 Auto-Detect</option>
+          <option value="en">🇺🇸 English</option>
+          <option value="si">🇱🇰 Sinhala (සිංහල)</option>
+          <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
+          <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
+          <option value="es">🇪🇸 Spanish (Español)</option>
+          <option value="fr">🇫🇷 French (Français)</option>
+          <option value="de">🇩🇪 German (Deutsch)</option>
+          <option value="ja">🇯🇵 Japanese (日本語)</option>
+          <option value="zh">🇨🇳 Chinese (中文)</option>
+          <option value="ar">🇸🇦 Arabic (العربية)</option>
+        </select>
+      </div>
       <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme">
         <span class="theme-icon" id="theme-icon">☀️</span>
         <span class="theme-label" id="theme-label">Light</span>

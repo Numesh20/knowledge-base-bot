@@ -167,17 +167,44 @@ def retrieve(question, top_k=3):
 
 def build_prompt(question, context_chunks, history):
     """Build the prompt string — shared by streaming and non-streaming."""
+LANGUAGE_NAMES = {
+    "auto": "the language of the user's question",
+    "en": "English",
+    "si": "Sinhala (සිංහල)",
+    "ta": "Tamil (தமிழ்)",
+    "hi": "Hindi (हिन्दी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "ja": "Japanese (日本語)",
+    "zh": "Simplified Chinese (中文)",
+    "ar": "Arabic (العربية)"
+}
+
+def build_prompt(question, context_chunks, history, language="auto"):
+    """Build the prompt string — shared by streaming and non-streaming."""
     context = "\n\n".join(context_chunks)
     history_str = ""
     for turn in history[-4:]:
         history_str += f"User: {turn['question']}\nBot: {turn['answer']}\n\n"
 
     history_section = f"=== PREVIOUS CONVERSATION ===\n{history_str}\n" if history_str else ""
+    lang_name = LANGUAGE_NAMES.get(language, "the language of the question")
 
-    return f"""You are a helpful and friendly knowledge base assistant.
+    if language and language != "auto":
+        lang_instruction = f"""CRITICAL LANGUAGE INSTRUCTION:
+You MUST formulate your entire response in {lang_name}.
+Even though the knowledge base context is written in English, accurately explain and translate all relevant facts, concepts, and details into fluent, natural {lang_name}."""
+        no_info_msg = f'say in {lang_name} that you do not have that information in your knowledge base'
+    else:
+        lang_instruction = "Respond naturally in the same language as the user's question (e.g. if the user asks in Sinhala, answer in Sinhala; if in English, answer in English)."
+        no_info_msg = 'say: "I don\'t have that information in my knowledge base."'
+
+    return f"""You are a helpful, friendly, and knowledgeable multilingual assistant.
 Use the KNOWLEDGE BASE CONTEXT below to answer the user's question accurately.
-If the answer is not in the context, say: "I don't have that information in my knowledge base."
-Keep answers clear and concise.
+If the answer is not in the context, {no_info_msg}.
+{lang_instruction}
+Keep answers clear, well-structured, and helpful.
 
 {history_section}=== KNOWLEDGE BASE CONTEXT ===
 {context}
@@ -187,8 +214,8 @@ Current Question: {question}
 
 Answer:"""
 
-def generate_answer(question, context_chunks, history):
-    prompt = build_prompt(question, context_chunks, history)
+def generate_answer(question, context_chunks, history, language="auto"):
+    prompt = build_prompt(question, context_chunks, history, language=language)
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=prompt,
@@ -216,6 +243,7 @@ def home():
 # Request/Response models
 class ChatRequest(BaseModel):
     message: str
+    language: str = "auto"
 
 class ChatResponse(BaseModel):
     answer: str
@@ -232,7 +260,7 @@ def chat(req: ChatRequest):
         return JSONResponse({"answer": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left.", "sources": [], "history_length": 0})
 
     chunks, sources = retrieve(req.message)
-    answer = generate_answer(req.message, chunks, chat_history)
+    answer = generate_answer(req.message, chunks, chat_history, language=req.language)
     chat_history.append({"question": req.message, "answer": answer})
     if len(chat_history) > 20:
         chat_history = chat_history[-20:]
@@ -254,7 +282,7 @@ def stream_chat(req: ChatRequest):
 
     # Retrieve context before streaming
     chunks, sources = retrieve(req.message)
-    prompt = build_prompt(req.message, chunks, chat_history)
+    prompt = build_prompt(req.message, chunks, chat_history, language=req.language)
 
     def event_stream():
         full_answer = ""
