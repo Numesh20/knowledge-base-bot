@@ -344,10 +344,12 @@ def remove_document_internal(filename: str):
 
 @app.delete("/documents/{filename}")
 def delete_document(filename: str):
+    insights_cache.pop(os.path.basename(filename), None)
     return remove_document_internal(filename)
 
 @app.delete("/api/documents/{filename}")
 def delete_document_api(filename: str):
+    insights_cache.pop(os.path.basename(filename), None)
     return remove_document_internal(filename)
 
 class DeleteRequest(BaseModel):
@@ -355,7 +357,116 @@ class DeleteRequest(BaseModel):
 
 @app.post("/delete-document")
 def delete_document_post(req: DeleteRequest):
+    insights_cache.pop(os.path.basename(req.filename), None)
     return remove_document_internal(req.filename)
+
+# ── Document Insights Cache & Endpoints ──
+insights_cache = {}
+
+def generate_document_insights(filename: str):
+    safe_filename = os.path.basename(filename)
+    if safe_filename in insights_cache:
+        return insights_cache[safe_filename]
+
+    file_path = os.path.join("knowledge", safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Document '{safe_filename}' not found")
+
+    file_size_bytes = os.path.getsize(file_path)
+    if file_size_bytes < 1024:
+        file_size_str = f"{file_size_bytes} B"
+    elif file_size_bytes < 1024 * 1024:
+        file_size_str = f"{file_size_bytes / 1024:.1f} KB"
+    else:
+        file_size_str = f"{file_size_bytes / (1024 * 1024):.1f} MB"
+
+    ext = os.path.splitext(safe_filename)[1].upper().replace(".", "")
+    text = extract_text_from_file(file_path)
+    if not text.strip():
+        return {
+            "filename": safe_filename,
+            "file_type": ext,
+            "file_size": file_size_str,
+            "chunks": 0,
+            "word_count": 0,
+            "summary": "This document appears to be empty or has no readable text.",
+            "takeaways": [],
+            "topics": []
+        }
+
+    chunks_in_doc = 0
+    if collection:
+        try:
+            all_data = collection.get()
+            for meta in all_data.get("metadatas", []):
+                if meta and os.path.basename(meta.get("source", "")) == safe_filename:
+                    chunks_in_doc += 1
+        except Exception:
+            pass
+
+    sample_text = text[:12000]
+
+    prompt = f"""You are an expert document analyst. Analyze this document and provide a structured JSON overview.
+
+DOCUMENT TITLE: {safe_filename}
+CONTENT EXCERPT:
+{sample_text}
+
+Return ONLY a valid JSON object with EXACTLY this structure:
+{{
+  "summary": "A clear, engaging 2-3 sentence executive summary of what this document covers.",
+  "takeaways": [
+    "Key takeaway point 1",
+    "Key takeaway point 2",
+    "Key takeaway point 3"
+  ],
+  "topics": [
+    "Topic 1",
+    "Topic 2",
+    "Topic 3",
+    "Topic 4"
+  ]
+}}"""
+
+    try:
+        from google.genai import types
+        config = types.GenerateContentConfig(response_mime_type="application/json")
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+            config=config,
+        )
+        resp_text = response.text.strip()
+        data = json.loads(resp_text)
+    except Exception as e:
+        print(f"[WARN] Insights generation fallback: {e}")
+        data = {
+            "summary": f"Document covering information from '{safe_filename}'.",
+            "takeaways": ["Contains reference information indexed in your knowledge base."],
+            "topics": [safe_filename.split(".")[0]]
+        }
+
+    result = {
+        "filename": safe_filename,
+        "file_type": ext,
+        "file_size": file_size_str,
+        "chunks": chunks_in_doc or len(chunk_text(text)),
+        "word_count": len(text.split()),
+        "summary": data.get("summary", ""),
+        "takeaways": data.get("takeaways", []),
+        "topics": data.get("topics", [])
+    }
+
+    insights_cache[safe_filename] = result
+    return result
+
+@app.get("/documents/{filename}/insights")
+def get_insights(filename: str):
+    return generate_document_insights(filename)
+
+@app.get("/api/documents/{filename}/insights")
+def get_insights_api(filename: str):
+    return generate_document_insights(filename)
 
 # ── Stats endpoint ──
 @app.get("/stats")

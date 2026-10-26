@@ -246,6 +246,67 @@
   </div>
 </div>
 
+<!-- ── DOCUMENT INSIGHTS MODAL ── -->
+<div class="modal-overlay" id="insights-modal" onclick="closeInsightsModal(event)">
+  <div class="modal-card insights-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon insights-icon">💡</span>
+        <div>
+          <h3 id="insights-filename">Document Insights</h3>
+          <div class="insights-badges" id="insights-meta-badges">
+            <span class="modal-badge">Loading...</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="closeInsightsModal()" title="Close">✕</button>
+    </div>
+    <div class="modal-body insights-modal-body" id="insights-body">
+      <!-- Loading State -->
+      <div class="insights-loading" id="insights-loading">
+        <div class="insights-spinner"></div>
+        <p>Analyzing document & generating AI insights...</p>
+      </div>
+
+      <!-- Loaded Content -->
+      <div class="insights-content" id="insights-content" style="display: none;">
+        <!-- Executive Summary -->
+        <div class="insight-section">
+          <div class="insight-section-header">
+            <span class="insight-section-title">📋 Executive Summary</span>
+          </div>
+          <div class="insight-summary-card" id="insight-summary-text"></div>
+        </div>
+
+        <!-- Key Takeaways -->
+        <div class="insight-section">
+          <div class="insight-section-header">
+            <span class="insight-section-title">🔑 Key Takeaways</span>
+          </div>
+          <ul class="takeaways-list" id="insight-takeaways-list"></ul>
+        </div>
+
+        <!-- Topics & Concepts -->
+        <div class="insight-section">
+          <div class="insight-section-header">
+            <span class="insight-section-title">🏷️ Core Topics & Concepts</span>
+            <span class="insight-subtext">Click any topic to ask the bot about it</span>
+          </div>
+          <div class="insight-topics-list" id="insight-topics-list"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="insights-actions">
+          <button class="btn-cancel" onclick="closeInsightsModal()">Close</button>
+          <button class="insights-ask-btn" id="insights-ask-btn" onclick="askAboutCurrentDocument()">
+            💬 Ask About This Document
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── TOAST NOTIFICATION ── -->
 <div id="toast-container" class="toast-container"></div>
 

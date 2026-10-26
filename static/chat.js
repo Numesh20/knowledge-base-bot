@@ -266,8 +266,11 @@ async function loadStats() {
         const icon = f.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
         const safeName = f.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         return `<div class="file-tag">
-          <span title="${f}">${icon} ${f}</span>
-          <button class="delete-doc-btn" onclick="openDeleteModal('${safeName}')" title="Delete '${safeName}'">✕</button>
+          <span class="file-tag-name" onclick="openInsightsModal('${safeName}')" title="Click to view AI Insights for ${f}">${icon} ${f}</span>
+          <div class="file-tag-actions">
+            <button class="insight-doc-btn" onclick="openInsightsModal('${safeName}')" title="AI Insights & Summary">💡</button>
+            <button class="delete-doc-btn" onclick="openDeleteModal('${safeName}')" title="Delete '${safeName}'">✕</button>
+          </div>
         </div>`;
       }).join("");
     }
@@ -764,7 +767,7 @@ function closeSourceModal(e) {
 // Close any open modal on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    ["source-modal", "export-modal", "delete-modal"].forEach(id => {
+    ["source-modal", "export-modal", "delete-modal", "insights-modal"].forEach(id => {
       const modal = document.getElementById(id);
       if (modal && modal.classList.contains("open")) {
         modal.classList.remove("open");
@@ -1119,6 +1122,124 @@ function updateVoiceUI(recording, statusText = "") {
     if (textEl && statusText) textEl.textContent = statusText;
   }
 }
+
+// ── Document Insights Modal & Logic ──
+let activeInsightsDoc = null;
+
+async function openInsightsModal(filename) {
+  activeInsightsDoc = filename;
+  const modal = document.getElementById("insights-modal");
+  const filenameEl = document.getElementById("insights-filename");
+  const badgesEl = document.getElementById("insights-meta-badges");
+  const loadingEl = document.getElementById("insights-loading");
+  const contentEl = document.getElementById("insights-content");
+
+  if (filenameEl) filenameEl.textContent = filename;
+  if (badgesEl) badgesEl.innerHTML = '<span class="modal-badge">Analyzing document...</span>';
+  if (loadingEl) {
+    loadingEl.style.display = "flex";
+    loadingEl.innerHTML = '<div class="insights-spinner"></div><p>Analyzing document & generating AI insights...</p>';
+  }
+  if (contentEl) contentEl.style.display = "none";
+  if (modal) modal.classList.add("open");
+
+  try {
+    const res = await fetch(`${API}/documents/${encodeURIComponent(filename)}/insights`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || "Failed to load insights");
+    }
+
+    const data = await res.json();
+
+    // Render metadata badges
+    if (badgesEl) {
+      badgesEl.innerHTML = `
+        <span class="modal-badge">${data.file_type || "FILE"}</span>
+        <span class="modal-badge">${data.file_size || ""}</span>
+        <span class="modal-badge">${data.chunks || 0} chunks</span>
+        <span class="modal-badge">${data.word_count || 0} words</span>
+      `;
+    }
+
+    // Render summary
+    const summaryEl = document.getElementById("insight-summary-text");
+    if (summaryEl) {
+      summaryEl.textContent = data.summary || "No summary available.";
+    }
+
+    // Render takeaways
+    const takeawaysEl = document.getElementById("insight-takeaways-list");
+    if (takeawaysEl) {
+      if (data.takeaways && data.takeaways.length > 0) {
+        takeawaysEl.innerHTML = data.takeaways.map(pt => `
+          <li>
+            <span class="takeaway-bullet">✓</span>
+            <span>${pt}</span>
+          </li>
+        `).join("");
+      } else {
+        takeawaysEl.innerHTML = '<li><span>Key information is indexed in the knowledge base.</span></li>';
+      }
+    }
+
+    // Render topics
+    const topicsEl = document.getElementById("insight-topics-list");
+    if (topicsEl) {
+      if (data.topics && data.topics.length > 0) {
+        topicsEl.innerHTML = data.topics.map(topic => {
+          const safeTopic = topic.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const safeDoc = filename.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          return `<button class="insight-topic-chip" onclick="askAboutTopic('${safeTopic}', '${safeDoc}')" title="Ask about ${topic}">🏷️ ${topic}</button>`;
+        }).join("");
+      } else {
+        topicsEl.innerHTML = '<span class="no-files">No specific topics extracted.</span>';
+      }
+    }
+
+    if (loadingEl) loadingEl.style.display = "none";
+    if (contentEl) contentEl.style.display = "block";
+
+  } catch (err) {
+    console.error("Insights error:", err);
+    if (loadingEl) {
+      loadingEl.innerHTML = `<p style="color: #f87171; text-align: center;">⚠️ Could not generate insights: ${err.message}</p>`;
+    }
+  }
+}
+
+function closeInsightsModal(e) {
+  if (e && e.target && e.target !== document.getElementById("insights-modal") && !e.target.classList.contains("modal-close-btn")) {
+    return;
+  }
+  const modal = document.getElementById("insights-modal");
+  if (modal) modal.classList.remove("open");
+  activeInsightsDoc = null;
+}
+
+function askAboutCurrentDocument() {
+  if (!activeInsightsDoc) return;
+  const doc = activeInsightsDoc;
+  closeInsightsModal();
+
+  const input = document.getElementById("user-input");
+  if (input) {
+    input.value = `Can you provide a summary of the key concepts and topics in "${doc}"?`;
+    autoResize(input);
+  }
+  sendMessage();
+}
+
+function askAboutTopic(topic, filename) {
+  closeInsightsModal();
+  const input = document.getElementById("user-input");
+  if (input) {
+    input.value = `What does "${filename}" explain about ${topic}?`;
+    autoResize(input);
+  }
+  sendMessage();
+}
+
 
 
 
