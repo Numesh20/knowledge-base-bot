@@ -61,9 +61,77 @@ body { display: flex; }
 .logo-text span { font-size: 0.72rem; color: var(--text3); }
 .sidebar-header { border-bottom: 1px solid var(--border); padding-bottom: 16px; }
 
-.stats-panel h3, .files-panel h3, .upload-panel h3 {
+/* ── NEW CHAT BUTTON ── */
+.new-chat-btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; width: 100%; padding: 10px 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.16), rgba(59, 130, 246, 0.16));
+  border: 1.5px solid rgba(139, 92, 246, 0.35);
+  color: var(--text); font-size: 0.86rem; font-weight: 600;
+  cursor: pointer; transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Inter', sans-serif; user-select: none;
+}
+.new-chat-btn:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(59, 130, 246, 0.28));
+  border-color: var(--purple);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25);
+  color: #fff;
+}
+.new-chat-btn svg { color: var(--purple2); transition: transform 0.2s ease; }
+.new-chat-btn:hover svg { transform: rotate(90deg); }
+
+/* ── SESSIONS PANEL ── */
+.sessions-panel { display: flex; flex-direction: column; gap: 8px; }
+.panel-header-row { display: flex; align-items: center; justify-content: space-between; }
+.session-count {
+  font-size: 0.65rem; background: var(--bg3);
+  border: 1px solid var(--border2); color: var(--text3);
+  padding: 1px 6px; border-radius: 999px; font-weight: 600;
+}
+.sessions-list {
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto; max-height: 175px; padding-right: 2px;
+}
+.sessions-list::-webkit-scrollbar { width: 3px; }
+.sessions-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.session-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  background: transparent; border: 1px solid transparent;
+  color: var(--text2); font-size: 0.78rem;
+  cursor: pointer; transition: all 0.18s ease;
+  position: relative; user-select: none;
+}
+.session-item:hover {
+  background: var(--bg3); color: var(--text);
+  border-color: var(--border);
+}
+.session-item.active {
+  background: rgba(139, 92, 246, 0.14);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: var(--purple2); font-weight: 500;
+}
+.session-icon { font-size: 0.85rem; flex-shrink: 0; opacity: 0.7; }
+.session-item.active .session-icon { opacity: 1; }
+.session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-actions { display: none; align-items: center; gap: 3px; flex-shrink: 0; }
+.session-item:hover .session-actions, .session-item.active .session-actions { display: flex; }
+.session-action-btn {
+  background: transparent; border: none;
+  color: var(--text3); font-size: 0.72rem;
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s ease;
+}
+.session-action-btn:hover { background: var(--bg2); color: var(--text); }
+.session-action-btn.delete:hover { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+
+.stats-panel h3, .files-panel h3, .upload-panel h3, .sessions-panel h3 {
   font-size: 0.72rem; font-weight: 600; color: var(--text3);
-  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
 }
 
 .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
@@ -809,6 +877,30 @@ body { display: flex; }
   background: rgba(239, 68, 68, 0.15);
   border-color: #ef4444;
   color: #ef4444;
+}
+
+[data-theme="light"] .new-chat-btn {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(37, 99, 235, 0.08));
+  border-color: rgba(124, 58, 237, 0.25);
+  color: #0f172a;
+}
+[data-theme="light"] .new-chat-btn:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(37, 99, 235, 0.16));
+  color: var(--purple);
+}
+[data-theme="light"] .session-item:hover {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .session-item.active {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.25);
+  color: var(--purple2);
+}
+[data-theme="light"] .session-count {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #64748b;
 }
 
 

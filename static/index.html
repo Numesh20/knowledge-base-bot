@@ -22,6 +22,26 @@
     </div>
   </div>
 
+  <!-- New Chat Button -->
+  <button class="new-chat-btn" id="new-chat-btn" onclick="createNewChatSession()" title="Start a fresh conversation">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    <span>New Chat</span>
+  </button>
+
+  <!-- Conversations Panel -->
+  <div class="sessions-panel">
+    <div class="panel-header-row">
+      <h3>Conversations</h3>
+      <span class="session-count" id="session-count">0</span>
+    </div>
+    <div class="sessions-list" id="sessions-list">
+      <p class="no-files">No past chats yet</p>
+    </div>
+  </div>
+
   <!-- Stats -->
   <div class="stats-panel">
     <h3>Knowledge Base</h3>

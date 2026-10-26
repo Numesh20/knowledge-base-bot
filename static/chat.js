@@ -33,9 +33,205 @@ function toggleTheme() {
   showToast(`Switched to ${next === "light" ? "Light" : "Dark"} mode`, "success");
 }
 
+// ── Multi-Chat Sessions ──
+let chatSessions = [];
+let currentSessionId = null;
+
+function loadSessions() {
+  try {
+    const raw = localStorage.getItem("kb_chat_sessions");
+    chatSessions = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    chatSessions = [];
+  }
+}
+
+function saveSessions() {
+  try {
+    localStorage.setItem("kb_chat_sessions", JSON.stringify(chatSessions));
+    if (currentSessionId) {
+      localStorage.setItem("kb_active_session_id", currentSessionId);
+    }
+  } catch (e) {
+    console.warn("Could not save chat sessions to localStorage:", e);
+  }
+}
+
+function getActiveSession() {
+  return chatSessions.find(s => s.id === currentSessionId);
+}
+
+function initChatSessions() {
+  loadSessions();
+  currentSessionId = localStorage.getItem("kb_active_session_id");
+
+  if (!chatSessions || chatSessions.length === 0) {
+    createNewChatSession(false);
+  } else {
+    if (!currentSessionId || !getActiveSession()) {
+      currentSessionId = chatSessions[0].id;
+    }
+    renderSessionsList();
+    renderActiveSessionMessages();
+  }
+}
+
+function renderWelcomeScreen() {
+  return `
+    <div class="welcome-screen" id="welcome">
+      <div class="welcome-icon">🧠</div>
+      <h2>Welcome to KnowledgeBot</h2>
+      <p>I can answer questions from your uploaded documents.<br/>
+         Upload a <strong>.txt</strong> or <strong>.pdf</strong> file on the left, or ask me about the sample knowledge!</p>
+      <div class="quick-prompts">
+        <button class="quick-btn" onclick="sendQuick('What are the working hours?')">⏰ Working hours?</button>
+        <button class="quick-btn" onclick="sendQuick('What products do you sell?')">📦 Products?</button>
+        <button class="quick-btn" onclick="sendQuick('How do I contact support?')">📧 Contact info?</button>
+        <button class="quick-btn" onclick="sendQuick('Tell me about the company')">🏢 About company?</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderActiveSessionMessages() {
+  const container = document.getElementById("messages");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const session = getActiveSession();
+  if (!session || !session.messages || session.messages.length === 0) {
+    container.innerHTML = renderWelcomeScreen();
+    return;
+  }
+
+  session.messages.forEach(msg => {
+    addMessage(msg.role, msg.text, msg.sources || []);
+  });
+}
+
+function renderSessionsList() {
+  const listEl = document.getElementById("sessions-list");
+  const countEl = document.getElementById("session-count");
+  if (!listEl) return;
+
+  if (countEl) countEl.textContent = chatSessions.length;
+
+  if (chatSessions.length === 0) {
+    listEl.innerHTML = '<p class="no-files">No past chats yet</p>';
+    return;
+  }
+
+  listEl.innerHTML = chatSessions.map(session => {
+    const isActive = session.id === currentSessionId;
+    const safeTitle = (session.title || "New Conversation").replace(/"/g, '&quot;');
+    const safeId = session.id.replace(/'/g, "\\'");
+    return `
+      <div class="session-item ${isActive ? "active" : ""}" onclick="switchChatSession('${safeId}')" title="${safeTitle}">
+        <span class="session-icon">💬</span>
+        <span class="session-title">${safeTitle}</span>
+        <div class="session-actions">
+          <button class="session-action-btn" onclick="renameChatSession(event, '${safeId}')" title="Rename conversation">✏️</button>
+          <button class="session-action-btn delete" onclick="deleteChatSession(event, '${safeId}')" title="Delete conversation">✕</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function createNewChatSession(notify = true) {
+  const newId = "session_" + Date.now();
+  const newSession = {
+    id: newId,
+    title: "New Conversation",
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  chatSessions.unshift(newSession);
+  saveSessions();
+  switchChatSession(newId, false);
+
+  if (notify) {
+    showToast("Started a new conversation", "success");
+  }
+}
+
+async function switchChatSession(sessionId, syncBackend = true) {
+  currentSessionId = sessionId;
+  saveSessions();
+  renderSessionsList();
+  renderActiveSessionMessages();
+
+  if (syncBackend) {
+    try {
+      await fetch(`${API}/clear`, { method: "POST" });
+    } catch (e) {}
+  }
+
+  const input = document.getElementById("user-input");
+  if (input) input.focus();
+}
+
+function deleteChatSession(event, sessionId) {
+  event.stopPropagation();
+
+  const idx = chatSessions.findIndex(s => s.id === sessionId);
+  if (idx === -1) return;
+
+  chatSessions.splice(idx, 1);
+
+  if (currentSessionId === sessionId) {
+    if (chatSessions.length > 0) {
+      currentSessionId = chatSessions[0].id;
+    } else {
+      createNewChatSession(false);
+      return;
+    }
+  }
+
+  saveSessions();
+  renderSessionsList();
+  renderActiveSessionMessages();
+  showToast("Conversation deleted", "success");
+}
+
+function renameChatSession(event, sessionId) {
+  event.stopPropagation();
+  const session = chatSessions.find(s => s.id === sessionId);
+  if (!session) return;
+
+  const newTitle = prompt("Rename conversation:", session.title);
+  if (newTitle && newTitle.trim()) {
+    session.title = newTitle.trim().slice(0, 40);
+    session.updatedAt = Date.now();
+    saveSessions();
+    renderSessionsList();
+    showToast("Conversation renamed", "success");
+  }
+}
+
+function appendMessageToActiveSession(role, text, sources = []) {
+  let session = getActiveSession();
+  if (!session) {
+    createNewChatSession(false);
+    session = getActiveSession();
+  }
+
+  if (role === "user" && (!session.title || session.title === "New Conversation")) {
+    session.title = text.slice(0, 32).trim() + (text.length > 32 ? "..." : "");
+  }
+
+  session.messages.push({ role, text, sources });
+  session.updatedAt = Date.now();
+  saveSessions();
+  renderSessionsList();
+}
+
 // ── Init ──
 window.onload = () => {
   initTheme();
+  initChatSessions();
   loadStats();
   setInterval(loadStats, 10000);  // refresh stats every 10s
 };
@@ -274,6 +470,7 @@ async function sendMessage() {
 
   // Add user bubble
   addMessage("user", message);
+  appendMessageToActiveSession("user", message);
   input.value = "";
   autoResize(input);
 
@@ -353,6 +550,7 @@ async function sendMessage() {
               document.getElementById("stat-chats").textContent = ev.history_length;
             }
             container.scrollTop = container.scrollHeight;
+            appendMessageToActiveSession("bot", fullText || "No response generated.", ev.sources || []);
 
           } else if (ev.type === "error") {
             contentEl.innerHTML = formatMessageText(ev.text || "⚠️ An error occurred.");
@@ -383,6 +581,7 @@ async function sendMessage() {
         sourcesEl.innerHTML = buildSourcesHTML(data.sources);
       }
       document.getElementById("stat-chats").textContent = data.history_length;
+      appendMessageToActiveSession("bot", data.answer, data.sources || []);
     } catch (fallbackErr) {
       contentEl.innerHTML = "⚠️ Connection error. Make sure the server is running (`py api.py`).";
     }
@@ -502,9 +701,15 @@ async function uploadFile(input) {
 // ── Clear history ──
 async function clearHistory() {
   await fetch(`${API}/clear`, { method: "POST" });
-  const container = document.getElementById("messages");
-  container.innerHTML = "";
-  addMessage("bot", "Chat history cleared! I still have all my documents loaded. Ask me anything! 🧠");
+  const session = getActiveSession();
+  if (session) {
+    session.messages = [];
+    session.title = "New Conversation";
+    saveSessions();
+    renderSessionsList();
+  }
+  renderActiveSessionMessages();
+  showToast("Chat cleared", "success");
   document.getElementById("stat-chats").textContent = "0";
 }
 
