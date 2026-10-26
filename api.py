@@ -214,13 +214,28 @@ Current Question: {question}
 
 Answer:"""
 
-def generate_answer(question, context_chunks, history, language="auto"):
+def generate_answer(question, context_chunks, history, language="auto", max_retries=3):
+    import time
     prompt = build_prompt(question, context_chunks, history, language=language)
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-    )
-    return response.text.strip()
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+            )
+            return response.text.strip()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt,
+                    )
+                    return response.text.strip()
+                except Exception:
+                    raise e
+            time.sleep(1.5 * (attempt + 1))
+    return "I'm having trouble connecting to the AI model right now. Please try again."
 
 
 # ── FastAPI App ──
@@ -287,11 +302,22 @@ def stream_chat(req: ChatRequest):
     def event_stream():
         full_answer = ""
         try:
-            # Use Gemini streaming
-            for chunk in client.models.generate_content_stream(
-                model="gemini-3.6-flash",
-                contents=prompt,
-            ):
+            # Use Gemini streaming with fallback if primary model is unavailable
+            stream_iter = None
+            for model_name in ["gemini-3.6-flash", "gemini-2.5-flash"]:
+                try:
+                    stream_iter = client.models.generate_content_stream(
+                        model=model_name,
+                        contents=prompt,
+                    )
+                    break
+                except Exception as stream_err:
+                    print(f"[WARN] Stream model {model_name} failed: {stream_err}. Trying fallback...")
+
+            if stream_iter is None:
+                raise RuntimeError("All AI models are currently busy. Please retry in a few moments.")
+
+            for chunk in stream_iter:
                 text_piece = chunk.text or ""
                 if text_piece:
                     full_answer += text_piece

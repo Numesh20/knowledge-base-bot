@@ -37,14 +37,17 @@
 
 | Feature | Description |
 |---------|-------------|
-| 🤖 **AI-Powered Answers** | Uses Google Gemini to understand and answer questions naturally |
-| 🔍 **Semantic Search** | Finds relevant info even if wording is different from the document |
-| 🗄️ **Local Vector DB** | ChromaDB stores all embeddings locally — your data stays private |
-| 💬 **Chat Memory** | Remembers previous questions in the same session |
-| 📄 **File Upload** | Upload `.txt` files directly from the browser |
-| 🔄 **Instant Learning** | Add new documents and the bot learns immediately |
-| 🌐 **Web Interface** | Beautiful ChatGPT-style browser UI |
-| 💻 **Terminal Mode** | Simple command-line interface also available |
+| 🤖 **AI-Powered Answers** | Uses Google Gemini with real-time SSE streaming and resilient fallback |
+| 🌐 **Multilingual Support** | Answer in 10+ languages (Sinhala, Tamil, Hindi, Spanish, French, German, Japanese, Chinese, Arabic, English, or Auto-Detect) |
+| 🎙️ **Voice Input (Speech-to-Text)** | Speak questions directly into your microphone with native language voice recognition |
+| 📊 **Document Insights** | One-click AI summaries, key takeaways, and interactive topic chips for any document |
+| 💬 **Multi-Chat Sessions** | Manage multiple conversation threads in the sidebar with rename, delete, and persistence |
+| 🔍 **Semantic Search** | Finds relevant info even if wording differs using ChromaDB vector embeddings |
+| 📄 **PDF & TXT Document Support** | Upload `.txt` or `.pdf` files directly from the browser for instant indexing |
+| 🗑️ **Document Management** | Inspect and delete uploaded documents with automatic ChromaDB cache cleanup |
+| ⬇️ **Chat Export** | Download entire conversations as formatted Markdown or Plain Text |
+| 🌓 **Dark & Light Mode** | Modern glassmorphic interface with seamless theme toggle |
+| 💻 **Terminal Mode** | Command-line interface (`bot.py`) for headless or server environments |
 
 ---
 
