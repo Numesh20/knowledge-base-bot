@@ -40,6 +40,8 @@
 | 🤖 **AI-Powered Answers** | Uses Google Gemini with real-time SSE streaming and resilient fallback |
 | 🌐 **Multilingual Support** | Answer in 10+ languages (Sinhala, Tamil, Hindi, Spanish, French, German, Japanese, Chinese, Arabic, English, or Auto-Detect) |
 | 🎙️ **Voice Input (Speech-to-Text)** | Speak questions directly into your microphone with native language voice recognition |
+| 🔊 **Voice Output (Text-to-Speech)** | Listen to AI responses read aloud with localized voice synthesis and clean audio reading |
+| 📋 **One-Click Answer Copy** | Quick-copy AI answers directly to clipboard with visual confirmation |
 | 📊 **Document Insights** | One-click AI summaries, key takeaways, and interactive topic chips for any document |
 | 💬 **Multi-Chat Sessions** | Manage multiple conversation threads in the sidebar with rename, delete, and persistence |
 | 🔍 **Semantic Search** | Finds relevant info even if wording differs using ChromaDB vector embeddings |

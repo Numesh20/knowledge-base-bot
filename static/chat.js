@@ -83,6 +83,140 @@ function changeLanguage(code) {
   showToast(`Language set to ${name}`, "success");
 }
 
+// ── Text-to-Speech (Voice Output) & Message Actions ──
+const messageTextRegistry = {};
+let currentSpeakingMsgId = null;
+
+function cleanTextForSpeech(text) {
+  if (!text) return "";
+  return text
+    .replace(/```[\s\S]*?```/g, " code block omitted ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_~]+/g, "")
+    .replace(/^[\s*•\-–—\d\.]+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stopTTS() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  if (currentSpeakingMsgId) {
+    const btn = document.getElementById(`tts-btn-${currentSpeakingMsgId}`);
+    if (btn) {
+      btn.classList.remove("speaking");
+      const icon = btn.querySelector(".tts-icon");
+      const label = btn.querySelector(".tts-label");
+      if (icon) icon.textContent = "🔊";
+      if (label) label.textContent = "Listen";
+    }
+    currentSpeakingMsgId = null;
+  }
+}
+
+function toggleTTS(msgId) {
+  if (!("speechSynthesis" in window)) {
+    showToast("Text-to-speech is not supported in this browser.", "error");
+    return;
+  }
+
+  if (currentSpeakingMsgId === msgId) {
+    stopTTS();
+    return;
+  }
+
+  stopTTS();
+
+  const rawText = messageTextRegistry[msgId];
+  if (!rawText) return;
+
+  const speechText = cleanTextForSpeech(rawText);
+  if (!speechText) return;
+
+  const utterance = new SpeechSynthesisUtterance(speechText);
+  const targetLang = LANG_VOICE_MAP[currentLanguage] || "en-US";
+  utterance.lang = targetLang;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices && voices.length > 0) {
+    const matchedVoice = voices.find(v => v.lang === targetLang || v.lang.replace("_", "-").startsWith(targetLang.slice(0, 2)));
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
+    }
+  }
+
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+
+  const btn = document.getElementById(`tts-btn-${msgId}`);
+  if (btn) {
+    btn.classList.add("speaking");
+    const icon = btn.querySelector(".tts-icon");
+    const label = btn.querySelector(".tts-label");
+    if (icon) icon.textContent = "⏹️";
+    if (label) label.textContent = "Stop";
+  }
+
+  currentSpeakingMsgId = msgId;
+
+  utterance.onend = () => {
+    if (currentSpeakingMsgId === msgId) {
+      stopTTS();
+    }
+  };
+
+  utterance.onerror = (e) => {
+    console.warn("TTS error:", e);
+    if (currentSpeakingMsgId === msgId) {
+      stopTTS();
+    }
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function copyMessageText(msgId) {
+  const rawText = messageTextRegistry[msgId];
+  if (!rawText) return;
+
+  navigator.clipboard.writeText(rawText).then(() => {
+    const btn = document.querySelector(`#actions-${msgId} .copy-msg-btn`);
+    if (btn) {
+      btn.classList.add("copied");
+      const icon = btn.querySelector(".copy-icon");
+      const label = btn.querySelector(".copy-label");
+      if (icon) icon.textContent = "✓";
+      if (label) label.textContent = "Copied";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        if (icon) icon.textContent = "📋";
+        if (label) label.textContent = "Copy";
+      }, 2000);
+    }
+    showToast("Answer copied to clipboard", "success");
+  }).catch(() => {
+    showToast("Failed to copy", "error");
+  });
+}
+
+function createMsgActionsHTML(msgId) {
+  return `
+    <div class="msg-actions-row">
+      <button type="button" class="msg-action-btn tts-btn" id="tts-btn-${msgId}" onclick="toggleTTS('${msgId}')" title="Listen to response (Text-to-Speech)">
+        <span class="tts-icon">🔊</span>
+        <span class="tts-label">Listen</span>
+      </button>
+      <button type="button" class="msg-action-btn copy-msg-btn" onclick="copyMessageText('${msgId}')" title="Copy answer to clipboard">
+        <span class="copy-icon">📋</span>
+        <span class="copy-label">Copy</span>
+      </button>
+    </div>
+  `;
+}
+
 // ── Multi-Chat Sessions ──
 let chatSessions = [];
 let currentSessionId = null;
@@ -208,6 +342,7 @@ function createNewChatSession(notify = true) {
 }
 
 async function switchChatSession(sessionId, syncBackend = true) {
+  stopTTS();
   currentSessionId = sessionId;
   saveSessions();
   renderSessionsList();
@@ -515,8 +650,9 @@ async function sendMessage() {
   const message = input.value.trim();
   if (!message) return;
 
-  // Stop voice recording if active
+  // Stop voice recording & TTS if active
   stopVoiceInput();
+  stopTTS();
 
   // Hide welcome screen
   const welcome = document.getElementById("welcome");
@@ -533,6 +669,7 @@ async function sendMessage() {
   btn.disabled = true;
 
   // Create live bot bubble
+  const msgId = "msg_" + Math.random().toString(36).slice(2, 10);
   const container = document.getElementById("messages");
   const botMsg = document.createElement("div");
   botMsg.className = "message bot";
@@ -547,6 +684,7 @@ async function sendMessage() {
         </div>
       </div>
       <div class="sources-container"></div>
+      <div class="actions-container" id="actions-${msgId}"></div>
     </div>
   `;
   container.appendChild(botMsg);
@@ -603,6 +741,11 @@ async function sendMessage() {
             if (ev.history_length !== undefined) {
               document.getElementById("stat-chats").textContent = ev.history_length;
             }
+            messageTextRegistry[msgId] = fullText || "No response generated.";
+            const actionsEl = botMsg.querySelector(".actions-container");
+            if (actionsEl) {
+              actionsEl.innerHTML = createMsgActionsHTML(msgId);
+            }
             container.scrollTop = container.scrollHeight;
             appendMessageToActiveSession("bot", fullText || "No response generated.", ev.sources || []);
 
@@ -635,6 +778,11 @@ async function sendMessage() {
         sourcesEl.innerHTML = buildSourcesHTML(data.sources);
       }
       document.getElementById("stat-chats").textContent = data.history_length;
+      messageTextRegistry[msgId] = data.answer;
+      const actionsEl = botMsg.querySelector(".actions-container");
+      if (actionsEl) {
+        actionsEl.innerHTML = createMsgActionsHTML(msgId);
+      }
       appendMessageToActiveSession("bot", data.answer, data.sources || []);
     } catch (fallbackErr) {
       contentEl.innerHTML = "⚠️ Connection error. Make sure the server is running (`py api.py`).";
@@ -661,11 +809,19 @@ function addMessage(role, text, sources = []) {
   const formatted = formatMessageText(text);
   const sourcesHTML = buildSourcesHTML(sources);
 
+  let actionsHTML = "";
+  if (role === "bot" && text) {
+    const msgId = "msg_" + Math.random().toString(36).slice(2, 10);
+    messageTextRegistry[msgId] = text;
+    actionsHTML = `<div class="actions-container" id="actions-${msgId}">${createMsgActionsHTML(msgId)}</div>`;
+  }
+
   msg.innerHTML = `
     <div class="avatar">${avatar}</div>
     <div class="bubble">
       <div class="bubble-content">${formatted}</div>
       ${sourcesHTML}
+      ${actionsHTML}
     </div>
   `;
 

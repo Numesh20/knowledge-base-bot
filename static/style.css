@@ -428,6 +428,38 @@ body { display: flex; }
   background: rgba(255,255,255,0.25); color: #fff;
 }
 
+/* ── Message Actions (TTS & Copy) ── */
+.msg-actions-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+}
+.msg-action-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text2); padding: 3px 9px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 500; font-family: 'Inter', sans-serif;
+  cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+.msg-action-btn:hover {
+  background: var(--bg3); color: var(--text);
+  border-color: var(--border2); transform: translateY(-1px);
+}
+.msg-action-btn.tts-btn:hover {
+  border-color: var(--purple); color: var(--purple2);
+}
+.msg-action-btn.tts-btn.speaking {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: var(--purple); color: #fff;
+  animation: speakingPulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes speakingPulse {
+  0% { box-shadow: 0 0 4px rgba(139, 92, 246, 0.4); transform: scale(1); }
+  100% { box-shadow: 0 0 12px rgba(139, 92, 246, 0.85); transform: scale(1.04); }
+}
+.msg-action-btn.copied {
+  color: #4ade80; border-color: #4ade80; background: rgba(74, 222, 128, 0.1);
+}
+
 /* Typing indicator */
 .typing-indicator { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
 .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); animation: blink 1.3s ease infinite; }
