@@ -37,11 +37,11 @@ from google.genai import types
 # ── Configure Gemini client ──
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# ── Helper: extract text from file (.txt or .pdf) ──
+# ── Helper: extract text from file (.txt, .pdf, .docx, .csv, .md) ──
 def extract_text_from_file(file_path):
-    """Extract text from a .txt or .pdf file."""
+    """Extract text from supported files: .txt, .pdf, .docx, .csv, .md."""
     ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".txt":
+    if ext in [".txt", ".md"]:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
     elif ext == ".pdf":
@@ -53,6 +53,46 @@ def extract_text_from_file(file_path):
             if t.strip():
                 pages_text.append(t.strip())
         return "\n\n".join(pages_text)
+    elif ext == ".docx":
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            tables_text = []
+            for table in doc.tables:
+                for row in table.rows:
+                    row_data = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if row_data:
+                        tables_text.append(" | ".join(row_data))
+            all_content = paragraphs + tables_text
+            return "\n\n".join(all_content)
+        except Exception as e:
+            print(f"  [ERROR] Failed to read Word document {file_path}: {e}")
+            return ""
+    elif ext == ".csv":
+        try:
+            import csv
+            rows_text = []
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                reader = csv.reader(f)
+                header = None
+                for i, row in enumerate(reader):
+                    clean_row = [cell.strip() for cell in row if cell.strip()]
+                    if not clean_row:
+                        continue
+                    if header is None:
+                        header = clean_row
+                        rows_text.append("Columns: " + ", ".join(header))
+                    else:
+                        row_items = []
+                        for col_idx, val in enumerate(clean_row):
+                            col_name = header[col_idx] if col_idx < len(header) else f"Column {col_idx+1}"
+                            row_items.append(f"{col_name}: {val}")
+                        rows_text.append(f"Row {i}: " + "; ".join(row_items))
+            return "\n".join(rows_text)
+        except Exception as e:
+            print(f"  [ERROR] Failed to read CSV file {file_path}: {e}")
+            return ""
     return ""
 
 # ── Helper: split text into chunks ──
@@ -87,7 +127,7 @@ def get_embedding(text, max_retries=3):
 
 # ── Build the Knowledge Base ──
 def build_knowledge_base():
-    """Load all .txt and .pdf files from /knowledge folder and store in ChromaDB."""
+    """Load all supported documents from /knowledge folder and store in ChromaDB."""
     print("\n[...] Building knowledge base...")
 
     # Connect to local ChromaDB (saves data in ./chroma_db folder)
@@ -101,11 +141,15 @@ def build_knowledge_base():
 
     collection = db.create_collection("knowledge_base")
 
-    # Find all .txt and .pdf files in the knowledge/ folder
-    files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    # Find all supported files in the knowledge/ folder (.txt, .pdf, .docx, .csv, .md)
+    files = []
+    for ext in [".txt", ".pdf", ".docx", ".csv", ".md"]:
+        files.extend(glob.glob(f"knowledge/*{ext}"))
+    files = sorted(files)
+
     if not files:
-        print("[WARN] No .txt or .pdf files found in the knowledge/ folder!")
-        print("       Add some .txt or .pdf files there and run again.")
+        print("[WARN] No supported files found in the knowledge/ folder!")
+        print("       Add some .txt, .pdf, .docx, .csv, or .md files there and run again.")
         return collection, 0
 
     total_chunks = 0

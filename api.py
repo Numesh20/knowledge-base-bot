@@ -49,13 +49,24 @@ doc_count = 0
 chunk_count = 0
 chat_history = []
 
+SUPPORTED_EXTENSIONS = [".txt", ".pdf", ".docx", ".csv", ".md"]
+
+def get_all_knowledge_files():
+    """Retrieve all supported knowledge base files from the knowledge/ directory."""
+    files = []
+    for ext in SUPPORTED_EXTENSIONS:
+        files.extend(glob.glob(f"knowledge/*{ext}"))
+    return sorted(files)
+
 # ── Helpers ──
 def extract_text_from_file(file_path):
-    """Extract text from a .txt or .pdf file."""
+    """Extract text from supported files: .txt, .pdf, .docx, .csv, .md."""
     ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".txt":
+
+    if ext in [".txt", ".md"]:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
+
     elif ext == ".pdf":
         reader = PdfReader(file_path)
         pages_text = []
@@ -64,6 +75,49 @@ def extract_text_from_file(file_path):
             if t.strip():
                 pages_text.append(t.strip())
         return "\n\n".join(pages_text)
+
+    elif ext == ".docx":
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            tables_text = []
+            for table in doc.tables:
+                for row in table.rows:
+                    row_data = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if row_data:
+                        tables_text.append(" | ".join(row_data))
+            all_content = paragraphs + tables_text
+            return "\n\n".join(all_content)
+        except Exception as e:
+            print(f"  [ERROR] Failed to read Word document {file_path}: {e}")
+            return ""
+
+    elif ext == ".csv":
+        try:
+            import csv
+            rows_text = []
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                reader = csv.reader(f)
+                header = None
+                for i, row in enumerate(reader):
+                    clean_row = [cell.strip() for cell in row if cell.strip()]
+                    if not clean_row:
+                        continue
+                    if header is None:
+                        header = clean_row
+                        rows_text.append("Columns: " + ", ".join(header))
+                    else:
+                        row_items = []
+                        for col_idx, val in enumerate(clean_row):
+                            col_name = header[col_idx] if col_idx < len(header) else f"Column {col_idx+1}"
+                            row_items.append(f"{col_name}: {val}")
+                        rows_text.append(f"Row {i}: " + "; ".join(row_items))
+            return "\n".join(rows_text)
+        except Exception as e:
+            print(f"  [ERROR] Failed to read CSV file {file_path}: {e}")
+            return ""
+
     return ""
 
 def chunk_text(text, chunk_size=400, overlap=50):
@@ -94,7 +148,7 @@ def get_embedding(text, max_retries=3):
 
 def build_kb(force_rebuild=False):
     global collection, doc_count, chunk_count
-    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    all_files = get_all_knowledge_files()
     doc_count = len(all_files)
 
     if not force_rebuild:
@@ -345,8 +399,8 @@ def stream_chat(req: ChatRequest):
 async def upload_file(file: UploadFile = File(...)):
     filename = file.filename
     ext = os.path.splitext(filename)[1].lower()
-    if ext not in [".txt", ".pdf"]:
-        raise HTTPException(status_code=400, detail="Only .txt and .pdf files are supported")
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format. Allowed: {', '.join(SUPPORTED_EXTENSIONS)}")
 
     save_path = f"knowledge/{filename}"
     with open(save_path, "wb") as f:
@@ -525,7 +579,7 @@ def get_insights_api(filename: str):
 # ── Stats endpoint ──
 @app.get("/stats")
 def stats():
-    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    all_files = get_all_knowledge_files()
     return {
         "docs": doc_count,
         "chunks": chunk_count,

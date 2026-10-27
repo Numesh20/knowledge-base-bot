@@ -1,0 +1,5 @@
+ProductID,ProductName,Category,Price,Warranty,KeyFeatures
+P101,SmartBot Enterprise,Software,$499/mo,24/7 SLA,Unlimited AI agents; Custom Knowledge RAG; Live Human Handoff
+P102,DataSense Analytics,BI Platform,$299/mo,Business Hours,Real-time Dashboards; Automated PDF Reports; SQL Connector
+P103,AutoFlow Engine,Automation,$149/mo,Standard Support,Webhook triggers; Zapier Integration; Multi-step Workflows
+P104,CloudSync Vault,Storage,$49/mo,99.9% Uptime,End-to-end Encryption; Version History; Audit Logs

@@ -266,7 +266,7 @@ function renderWelcomeScreen() {
       <div class="welcome-icon">🧠</div>
       <h2>Welcome to KnowledgeBot</h2>
       <p>I can answer questions from your uploaded documents.<br/>
-         Upload a <strong>.txt</strong> or <strong>.pdf</strong> file on the left, or ask me about the sample knowledge!</p>
+         Upload a <strong>.pdf</strong>, <strong>.docx</strong>, <strong>.csv</strong>, <strong>.md</strong>, or <strong>.txt</strong> file on the left, or ask me about the sample knowledge!</p>
       <div class="quick-prompts">
         <button class="quick-btn" onclick="sendQuick('What are the working hours?')">⏰ Working hours?</button>
         <button class="quick-btn" onclick="sendQuick('What products do you sell?')">📦 Products?</button>
@@ -443,13 +443,23 @@ async function loadStats() {
       status.textContent = `Ready — ${data.docs} document${data.docs > 1 ? "s" : ""} loaded`;
     }
 
+// ── File format icon helper ──
+function getFileIcon(filename) {
+  const lower = (filename || "").toLowerCase();
+  if (lower.endsWith(".pdf")) return "📕";
+  if (lower.endsWith(".docx")) return "📘";
+  if (lower.endsWith(".csv")) return "📊";
+  if (lower.endsWith(".md")) return "📝";
+  return "📄";
+}
+
     // Files list
     const filesList = document.getElementById("files-list");
     if (data.files.length === 0) {
       filesList.innerHTML = '<p class="no-files">No files yet</p>';
     } else {
       filesList.innerHTML = data.files.map(f => {
-        const icon = f.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
+        const icon = getFileIcon(f);
         const safeName = f.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         return `<div class="file-tag">
           <span class="file-tag-name" onclick="openInsightsModal('${safeName}')" title="Click to view AI Insights for ${f}">${icon} ${f}</span>
@@ -637,7 +647,7 @@ function buildSourcesHTML(sources) {
       chunkText,
     };
 
-    const icon = filename.toLowerCase().endsWith(".pdf") ? "📕" : "📄";
+    const icon = getFileIcon(filename);
     return `<button type="button" class="source-tag clickable" onclick="openSourceModal('${sourceId}')" title="Click to inspect retrieved passage">${icon} ${filename} <span class="chunk-badge">#${chunkNum}</span></button>`;
   }).join("");
 
@@ -887,7 +897,7 @@ async function uploadFile(input) {
     const data = await res.json();
     status.textContent = `✓ ${data.message}`;
     status.className = "upload-status success";
-    label.textContent = "📁 Choose File (.txt / .pdf)";
+    label.textContent = "📁 Upload Document";
 
     // Reload stats
     loadStats();
@@ -900,7 +910,7 @@ async function uploadFile(input) {
   } catch (err) {
     status.textContent = `✗ ${err.message}`;
     status.className = "upload-status error";
-    label.textContent = "📁 Choose File (.txt / .pdf)";
+    label.textContent = "📁 Upload Document";
   }
 
   // Reset file input
