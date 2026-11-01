@@ -1,22 +1,10 @@
-# ─────────────────────────────────────────────
-#  Knowledge Base Bot — Python Dependencies
-# ─────────────────────────────────────────────
-
-# Google Gemini SDK — FREE AI
+# Knowledge Base Bot - Python Dependencies
 google-genai>=2.0.0
 google-generativeai>=0.7.0
-
-# ChromaDB — local vector database
 chromadb>=0.5.0
-
-# Web Framework
 fastapi>=0.110.0
 uvicorn>=0.28.0
 python-multipart>=0.0.9
-
-# Document Parsers
 pypdf>=5.0.0
 python-docx>=1.1.0
-
-# Utilities
 python-dotenv>=1.0.0

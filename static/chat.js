@@ -1,4 +1,4 @@
-// ── KnowledgeBot Web UI — chat.js ──
+﻿// ── KnowledgeBot Web UI — chat.js ──
 
 const API = "";  // same origin
 
@@ -1733,8 +1733,4 @@ function askAboutViewerDocument() {
   }
   sendMessage();
 }
-
-
-
-
 
