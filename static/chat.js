@@ -354,27 +354,103 @@ function renderActiveSessionMessages() {
   });
 }
 
+let sessionSearchQuery = "";
+
+function handleSessionSearch(val) {
+  sessionSearchQuery = val || "";
+  const clearBtn = document.getElementById("sessions-search-clear");
+  if (clearBtn) {
+    clearBtn.style.display = sessionSearchQuery.trim() ? "inline-block" : "none";
+  }
+  renderSessionsList();
+}
+
+function clearSessionSearch() {
+  sessionSearchQuery = "";
+  const input = document.getElementById("sessions-search-input");
+  const clearBtn = document.getElementById("sessions-search-clear");
+  if (input) input.value = "";
+  if (clearBtn) clearBtn.style.display = "none";
+  renderSessionsList();
+  if (input) input.focus();
+}
+
+function togglePinChatSession(event, sessionId) {
+  event.stopPropagation();
+  const session = chatSessions.find(s => s.id === sessionId);
+  if (!session) return;
+
+  session.pinned = !session.pinned;
+  session.updatedAt = Date.now();
+  saveSessions();
+  renderSessionsList();
+  showToast(session.pinned ? "📌 Conversation pinned to top" : "Conversation unpinned", "info");
+}
+
 function renderSessionsList() {
   const listEl = document.getElementById("sessions-list");
   const countEl = document.getElementById("session-count");
   if (!listEl) return;
 
-  if (countEl) countEl.textContent = chatSessions.length;
-
   if (chatSessions.length === 0) {
+    if (countEl) countEl.textContent = "0";
     listEl.innerHTML = '<p class="no-files">No past chats yet</p>';
     return;
   }
 
-  listEl.innerHTML = chatSessions.map(session => {
+  const query = sessionSearchQuery.toLowerCase().trim();
+  let filtered = chatSessions.filter(session => {
+    if (!query) return true;
+    const titleMatch = (session.title || "").toLowerCase().includes(query);
+    if (titleMatch) return true;
+    const msgMatch = (session.messages || []).some(m => (m.text || "").toLowerCase().includes(query));
+    return msgMatch;
+  });
+
+  if (countEl) {
+    countEl.textContent = query ? `${filtered.length}/${chatSessions.length}` : chatSessions.length;
+  }
+
+  if (filtered.length === 0) {
+    const safeQ = sessionSearchQuery.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    listEl.innerHTML = `<p class="no-files">No chats matching "${safeQ}"</p>`;
+    return;
+  }
+
+  // Sort: pinned first, then by updatedAt descending
+  filtered.sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+
+  listEl.innerHTML = filtered.map(session => {
     const isActive = session.id === currentSessionId;
+    const isPinned = Boolean(session.pinned);
     const safeTitle = (session.title || "New Conversation").replace(/"/g, '&quot;');
     const safeId = session.id.replace(/'/g, "\\'");
+
+    let matchSnippet = "";
+    if (query && !session.title.toLowerCase().includes(query)) {
+      const matchedMsg = (session.messages || []).find(m => (m.text || "").toLowerCase().includes(query));
+      if (matchedMsg && matchedMsg.text) {
+        const text = matchedMsg.text;
+        const idx = text.toLowerCase().indexOf(query);
+        const start = Math.max(0, idx - 12);
+        const snippet = text.slice(start, start + 36).replace(/\s+/g, ' ').replace(/"/g, '&quot;');
+        matchSnippet = `<span class="session-match-snippet">“${snippet}…”</span>`;
+      }
+    }
+
     return `
-      <div class="session-item ${isActive ? "active" : ""}" onclick="switchChatSession('${safeId}')" title="${safeTitle}">
-        <span class="session-icon">💬</span>
-        <span class="session-title">${safeTitle}</span>
+      <div class="session-item ${isActive ? "active" : ""} ${isPinned ? "pinned" : ""}" onclick="switchChatSession('${safeId}')" title="${safeTitle}">
+        <span class="session-icon" title="${isPinned ? "Pinned conversation" : "Chat session"}">${isPinned ? "📌" : "💬"}</span>
+        <div class="session-item-content">
+          <span class="session-title">${safeTitle}</span>
+          ${matchSnippet}
+        </div>
         <div class="session-actions">
+          <button class="session-action-btn pin ${isPinned ? "pinned" : ""}" onclick="togglePinChatSession(event, '${safeId}')" title="${isPinned ? "Unpin conversation" : "Pin to top"}">${isPinned ? "📌" : "📍"}</button>
           <button class="session-action-btn" onclick="renameChatSession(event, '${safeId}')" title="Rename conversation">✏️</button>
           <button class="session-action-btn delete" onclick="deleteChatSession(event, '${safeId}')" title="Delete conversation">✕</button>
         </div>
@@ -389,6 +465,7 @@ function createNewChatSession(notify = true) {
     id: newId,
     title: "New Conversation",
     messages: [],
+    pinned: false,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };

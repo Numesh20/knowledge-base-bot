@@ -45,7 +45,7 @@
 | 📊 **Document Insights** | One-click AI summaries, key takeaways, and interactive topic chips for any document |
 | 👁️ **Document Content Viewer** | In-browser preview of full document content with word count, copy text, and quick-ask action |
 | 🎯 **Document Scope Filter** | Restrict searches to a specific document or search across the entire knowledge base with dynamic UI badges |
-| 💬 **Multi-Chat Sessions** | Manage multiple conversation threads in the sidebar with rename, delete, and persistence |
+| 💬 **Multi-Chat Sessions & Pinning** | Manage multiple conversation threads with real-time keyword search, pin-to-top (📌), rename, delete, and persistence |
 | 🔍 **Semantic Search** | Finds relevant info even if wording differs using ChromaDB vector embeddings |
 | 📄 **Multi-Format Document Support** | Upload `.pdf`, `.docx`, `.csv`, `.md`, or `.txt` files directly from the browser for instant indexing |
 | 🗑️ **Document Management** | Inspect and delete uploaded documents with automatic ChromaDB cache cleanup |

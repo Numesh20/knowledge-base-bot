@@ -37,6 +37,11 @@
       <h3>Conversations</h3>
       <span class="session-count" id="session-count">0</span>
     </div>
+    <div class="sessions-search-wrap">
+      <span class="sessions-search-icon">🔍</span>
+      <input type="text" id="sessions-search-input" class="sessions-search-input" placeholder="Search chats..." oninput="handleSessionSearch(this.value)" aria-label="Search conversations" />
+      <button id="sessions-search-clear" class="sessions-search-clear" onclick="clearSessionSearch()" style="display:none;" title="Clear search">✕</button>
+    </div>
     <div class="sessions-list" id="sessions-list">
       <p class="no-files">No past chats yet</p>
     </div>
