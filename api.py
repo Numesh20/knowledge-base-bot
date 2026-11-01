@@ -197,13 +197,43 @@ def build_kb(force_rebuild=False):
 
     print(f"[READY] {doc_count} files, {chunk_count} chunks loaded.\n")
 
-def retrieve(question, top_k=3):
+def retrieve(question, top_k=3, doc_filter=None):
     if not collection:
         return [], []
     emb = get_embedding(question)
-    results = collection.query(query_embeddings=[emb], n_results=min(top_k, chunk_count or 1))
-    chunks = results["documents"][0] if results.get("documents") else []
-    metas = results["metadatas"][0] if results.get("metadatas") else []
+
+    where_filter = None
+    if doc_filter and doc_filter != "all":
+        safe_doc = os.path.basename(doc_filter)
+        possible_sources = list(dict.fromkeys([
+            safe_doc,
+            f"knowledge/{safe_doc}",
+            f"knowledge\\{safe_doc}",
+            os.path.join("knowledge", safe_doc)
+        ]))
+        where_filter = {"source": {"$in": possible_sources}}
+
+    chunks = []
+    metas = []
+    try:
+        results = collection.query(
+            query_embeddings=[emb],
+            n_results=min(top_k, chunk_count or 1),
+            where=where_filter
+        )
+        chunks = results["documents"][0] if results.get("documents") else []
+        metas = results["metadatas"][0] if results.get("metadatas") else []
+    except Exception:
+        try:
+            results = collection.query(
+                query_embeddings=[emb],
+                n_results=1,
+                where=where_filter
+            )
+            chunks = results["documents"][0] if results.get("documents") else []
+            metas = results["metadatas"][0] if results.get("metadatas") else []
+        except Exception:
+            pass
 
     source_details = []
     for i, chunk_text in enumerate(chunks):
@@ -233,7 +263,7 @@ LANGUAGE_NAMES = {
     "ar": "Arabic (العربية)"
 }
 
-def build_prompt(question, context_chunks, history, language="auto"):
+def build_prompt(question, context_chunks, history, language="auto", doc_filter="all"):
     """Build the prompt string — shared by streaming and non-streaming."""
     context = "\n\n".join(context_chunks)
     history_str = ""
@@ -243,17 +273,25 @@ def build_prompt(question, context_chunks, history, language="auto"):
     history_section = f"=== PREVIOUS CONVERSATION ===\n{history_str}\n" if history_str else ""
     lang_name = LANGUAGE_NAMES.get(language, "the language of the question")
 
+    scope_name = os.path.basename(doc_filter) if doc_filter and doc_filter != "all" else None
+    if scope_name:
+        scope_instruction = f"\nSCOPE RESTRICTION: The user requested answers ONLY from the document '{scope_name}'. Do not invent facts outside this document."
+        no_info_target = f'in the document "{scope_name}"'
+    else:
+        scope_instruction = ""
+        no_info_target = 'in your knowledge base'
+
     if language and language != "auto":
         lang_instruction = f"""CRITICAL LANGUAGE INSTRUCTION:
 You MUST formulate your entire response in {lang_name}.
 Even though the knowledge base context is written in English, accurately explain and translate all relevant facts, concepts, and details into fluent, natural {lang_name}."""
-        no_info_msg = f'say in {lang_name} that you do not have that information in your knowledge base'
+        no_info_msg = f'say in {lang_name} that you do not have that information {no_info_target}'
     else:
         lang_instruction = "Respond naturally in the same language as the user's question (e.g. if the user asks in Sinhala, answer in Sinhala; if in English, answer in English)."
-        no_info_msg = 'say: "I don\'t have that information in my knowledge base."'
+        no_info_msg = f'say: "I don\'t have that information {no_info_target}."'
 
     return f"""You are a helpful, friendly, and knowledgeable multilingual assistant.
-Use the KNOWLEDGE BASE CONTEXT below to answer the user's question accurately.
+Use the KNOWLEDGE BASE CONTEXT below to answer the user's question accurately.{scope_instruction}
 If the answer is not in the context, {no_info_msg}.
 {lang_instruction}
 Keep answers clear, well-structured, and helpful.
@@ -266,9 +304,9 @@ Current Question: {question}
 
 Answer:"""
 
-def generate_answer(question, context_chunks, history, language="auto", max_retries=3):
+def generate_answer(question, context_chunks, history, language="auto", doc_filter="all", max_retries=3):
     import time
-    prompt = build_prompt(question, context_chunks, history, language=language)
+    prompt = build_prompt(question, context_chunks, history, language=language, doc_filter=doc_filter)
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
@@ -311,11 +349,13 @@ def home():
 class ChatRequest(BaseModel):
     message: str
     language: str = "auto"
+    doc_filter: str = "all"
 
 class ChatResponse(BaseModel):
     answer: str
     sources: list
     history_length: int
+    doc_filter: str = "all"
 
 # ── Chat endpoint (non-streaming fallback) ──
 @app.post("/chat")
@@ -324,14 +364,14 @@ def chat(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Empty message")
     if chunk_count == 0:
-        return JSONResponse({"answer": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left.", "sources": [], "history_length": 0})
+        return JSONResponse({"answer": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left.", "sources": [], "history_length": 0, "doc_filter": req.doc_filter})
 
-    chunks, sources = retrieve(req.message)
-    answer = generate_answer(req.message, chunks, chat_history, language=req.language)
+    chunks, sources = retrieve(req.message, doc_filter=req.doc_filter)
+    answer = generate_answer(req.message, chunks, chat_history, language=req.language, doc_filter=req.doc_filter)
     chat_history.append({"question": req.message, "answer": answer})
     if len(chat_history) > 20:
         chat_history = chat_history[-20:]
-    return {"answer": answer, "sources": sources, "history_length": len(chat_history)}
+    return {"answer": answer, "sources": sources, "history_length": len(chat_history), "doc_filter": req.doc_filter}
 
 # ── Streaming chat endpoint (Server-Sent Events) ──
 @app.post("/stream")
@@ -344,12 +384,12 @@ def stream_chat(req: ChatRequest):
         def no_kb():
             data = {"type": "token", "text": "No knowledge loaded yet! Upload a .txt or .pdf file first using the panel on the left."}
             yield f"data: {json.dumps(data)}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'sources': [], 'history_length': 0})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'sources': [], 'history_length': 0, 'doc_filter': req.doc_filter})}\n\n"
         return StreamingResponse(no_kb(), media_type="text/event-stream")
 
     # Retrieve context before streaming
-    chunks, sources = retrieve(req.message)
-    prompt = build_prompt(req.message, chunks, chat_history, language=req.language)
+    chunks, sources = retrieve(req.message, doc_filter=req.doc_filter)
+    prompt = build_prompt(req.message, chunks, chat_history, language=req.language, doc_filter=req.doc_filter)
 
     def event_stream():
         full_answer = ""
@@ -381,8 +421,13 @@ def stream_chat(req: ChatRequest):
             if len(chat_history) > 20:
                 chat_history[:] = chat_history[-20:]
 
-            # Send done event with sources
-            done_data = {"type": "done", "sources": sources, "history_length": len(chat_history)}
+            # Send done event with sources and active doc filter
+            done_data = {
+                "type": "done",
+                "sources": sources,
+                "history_length": len(chat_history),
+                "doc_filter": req.doc_filter
+            }
             yield f"data: {json.dumps(done_data)}\n\n"
 
         except Exception as e:

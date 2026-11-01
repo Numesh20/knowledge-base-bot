@@ -136,6 +136,18 @@
 
   <!-- Input -->
   <div class="input-area">
+    <div class="doc-scope-bar" id="doc-scope-bar">
+      <div class="doc-scope-left">
+        <span class="doc-scope-icon">🎯</span>
+        <span class="doc-scope-label">Search Scope:</span>
+        <select id="doc-scope-select" class="doc-scope-select" onchange="changeDocScope(this.value)" aria-label="Target Document Filter">
+          <option value="all">📚 All Documents</option>
+        </select>
+      </div>
+      <button class="doc-scope-reset" id="doc-scope-reset" onclick="changeDocScope('all')" style="display: none;" title="Reset filter to all documents">
+        ✕ Reset to All
+      </button>
+    </div>
     <div class="input-box">
       <textarea id="user-input"
         placeholder="Ask a question about your knowledge base..."

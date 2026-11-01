@@ -83,6 +83,67 @@ function changeLanguage(code) {
   showToast(`Language set to ${name}`, "success");
 }
 
+// ── Document Scope Filter ──
+let currentDocScope = "all";
+
+function updateDocScopeDropdown(files = []) {
+  const select = document.getElementById("doc-scope-select");
+  if (!select) return;
+
+  const prevScope = currentDocScope;
+  let html = `<option value="all">📚 All Documents (${files.length})</option>`;
+  files.forEach(f => {
+    const icon = getFileIcon(f);
+    html += `<option value="${f}">${icon} ${f}</option>`;
+  });
+  select.innerHTML = html;
+
+  // Preserve previous scope if still valid
+  if (prevScope !== "all" && files.includes(prevScope)) {
+    select.value = prevScope;
+    currentDocScope = prevScope;
+  } else {
+    select.value = "all";
+    currentDocScope = "all";
+  }
+  updateDocScopeUI();
+}
+
+function changeDocScope(scope, showNotification = true) {
+  currentDocScope = scope || "all";
+  const select = document.getElementById("doc-scope-select");
+  if (select) {
+    select.value = currentDocScope;
+  }
+  updateDocScopeUI();
+
+  if (showNotification) {
+    if (currentDocScope !== "all") {
+      showToast(`Search restricted to "${currentDocScope}"`, "info");
+    } else {
+      showToast("Searching across all documents", "info");
+    }
+  }
+}
+
+function updateDocScopeUI() {
+  const bar = document.getElementById("doc-scope-bar");
+  const resetBtn = document.getElementById("doc-scope-reset");
+  const input = document.getElementById("user-input");
+
+  const isFiltered = currentDocScope && currentDocScope !== "all";
+  if (bar) bar.classList.toggle("active", isFiltered);
+  if (resetBtn) resetBtn.style.display = isFiltered ? "inline-block" : "none";
+
+  if (input) {
+    if (isFiltered) {
+      input.placeholder = `Ask a question specifically about "${currentDocScope}"...`;
+    } else {
+      input.placeholder = "Ask a question about your knowledge base...";
+    }
+  }
+}
+
 // ── Text-to-Speech (Voice Output) & Message Actions ──
 const messageTextRegistry = {};
 let currentSpeakingMsgId = null;
@@ -471,6 +532,9 @@ function getFileIcon(filename) {
         </div>`;
       }).join("");
     }
+
+    // Populate search scope filter dropdown
+    updateDocScopeDropdown(data.files || []);
   } catch (err) {
     document.getElementById("status-dot").classList.add("loading");
     document.getElementById("header-status").textContent = "Connecting to server...";
@@ -684,9 +748,13 @@ async function sendMessage() {
   const container = document.getElementById("messages");
   const botMsg = document.createElement("div");
   botMsg.className = "message bot";
+  const activeScopeBadge = (currentDocScope && currentDocScope !== "all")
+    ? `<div class="msg-scope-badge">🎯 Scoped to: ${currentDocScope.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+    : "";
   botMsg.innerHTML = `
     <div class="avatar">🧠</div>
     <div class="bubble">
+      ${activeScopeBadge}
       <div class="bubble-content">
         <div class="typing-indicator" style="padding:4px 0">
           <div class="typing-dot"></div>
@@ -710,7 +778,7 @@ async function sendMessage() {
     const res = await fetch(`${API}/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, language: currentLanguage }),
+      body: JSON.stringify({ message, language: currentLanguage, doc_filter: currentDocScope }),
     });
 
     if (!res.ok) {
@@ -781,7 +849,7 @@ async function sendMessage() {
       const fallbackRes = await fetch(`${API}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, language: currentLanguage }),
+        body: JSON.stringify({ message, language: currentLanguage, doc_filter: currentDocScope }),
       });
       const data = await fallbackRes.json();
       contentEl.innerHTML = formatMessageText(data.answer);
@@ -811,7 +879,7 @@ function sendQuick(text) {
 }
 
 // ── Add static message bubble (for welcome/system/uploads) ──
-function addMessage(role, text, sources = []) {
+function addMessage(role, text, sources = [], docFilter = null) {
   const container = document.getElementById("messages");
   const msg = document.createElement("div");
   msg.className = `message ${role}`;
@@ -827,9 +895,14 @@ function addMessage(role, text, sources = []) {
     actionsHTML = `<div class="actions-container" id="actions-${msgId}">${createMsgActionsHTML(msgId)}</div>`;
   }
 
+  const scopeBadge = (role === "bot" && docFilter && docFilter !== "all")
+    ? `<div class="msg-scope-badge">🎯 Scoped to: ${docFilter.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+    : "";
+
   msg.innerHTML = `
     <div class="avatar">${avatar}</div>
     <div class="bubble">
+      ${scopeBadge}
       <div class="bubble-content">${formatted}</div>
       ${sourcesHTML}
       ${actionsHTML}
@@ -1439,6 +1512,7 @@ function askAboutCurrentDocument() {
   if (!activeInsightsDoc) return;
   const doc = activeInsightsDoc;
   closeInsightsModal();
+  changeDocScope(doc, false);
 
   const input = document.getElementById("user-input");
   if (input) {
@@ -1450,6 +1524,7 @@ function askAboutCurrentDocument() {
 
 function askAboutTopic(topic, filename) {
   closeInsightsModal();
+  changeDocScope(filename, false);
   const input = document.getElementById("user-input");
   if (input) {
     input.value = `What does "${filename}" explain about ${topic}?`;
@@ -1571,6 +1646,7 @@ function askAboutViewerDocument() {
   if (!activeViewerDoc) return;
   const doc = activeViewerDoc;
   closeDocViewerModal();
+  changeDocScope(doc, false);
 
   const input = document.getElementById("user-input");
   if (input) {
