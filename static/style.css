@@ -159,7 +159,7 @@ body { display: flex; }
 .file-tag span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .file-tag span:hover { text-decoration: underline; color: #fff; }
 .file-tag-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.insight-doc-btn, .delete-doc-btn {
+.view-doc-btn, .insight-doc-btn, .delete-doc-btn {
   background: transparent; border: none;
   color: var(--text3); font-size: 0.78rem;
   width: 22px; height: 22px; border-radius: 5px;
@@ -167,7 +167,12 @@ body { display: flex; }
   cursor: pointer; transition: all 0.2s ease;
   opacity: 0.6; flex-shrink: 0;
 }
-.file-tag:hover .insight-doc-btn, .file-tag:hover .delete-doc-btn { opacity: 1; }
+.file-tag:hover .view-doc-btn, .file-tag:hover .insight-doc-btn, .file-tag:hover .delete-doc-btn { opacity: 1; }
+.view-doc-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+  transform: scale(1.15);
+}
 .insight-doc-btn:hover {
   background: rgba(139, 92, 246, 0.25);
   color: var(--purple2);
@@ -1160,6 +1165,110 @@ body { display: flex; }
 [data-theme="light"] .file-tag span:hover {
   color: var(--purple);
 }
+
+/* ── Document Viewer Modal Styles ── */
+.viewer-modal-card {
+  max-width: 760px;
+  max-height: 88vh;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.viewer-modal-body {
+  padding: 16px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 12px;
+}
+.viewer-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text2);
+}
+.viewer-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.viewer-dot {
+  opacity: 0.5;
+}
+.viewer-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.viewer-switch-btn, .btn-secondary-action {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+}
+.viewer-switch-btn:hover, .btn-secondary-action:hover {
+  border-color: var(--purple);
+  color: var(--purple2);
+  background: rgba(139, 92, 246, 0.1);
+}
+.viewer-text-container {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text);
+  max-height: 52vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  word-break: break-word;
+  user-select: text;
+}
+.viewer-empty-msg {
+  color: var(--text3);
+  text-align: center;
+  padding: 30px;
+  font-style: italic;
+}
+
+/* Light Theme Overrides for Viewer */
+[data-theme="light"] .viewer-modal-card {
+  background: #ffffff;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+[data-theme="light"] .viewer-text-container {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+[data-theme="light"] .viewer-switch-btn, [data-theme="light"] .btn-secondary-action {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+[data-theme="light"] .viewer-switch-btn:hover, [data-theme="light"] .btn-secondary-action:hover {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: var(--purple);
+  color: var(--purple2);
+}
+
 
 
 

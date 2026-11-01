@@ -219,8 +219,6 @@ def retrieve(question, top_k=3):
 
     return chunks, source_details
 
-def build_prompt(question, context_chunks, history):
-    """Build the prompt string — shared by streaming and non-streaming."""
 LANGUAGE_NAMES = {
     "auto": "the language of the user's question",
     "en": "English",
@@ -435,7 +433,7 @@ def remove_document_internal(filename: str):
             deleted_chunks = len(ids_to_delete)
         chunk_count = collection.count()
 
-    all_files = glob.glob("knowledge/*.txt") + glob.glob("knowledge/*.pdf")
+    all_files = get_all_knowledge_files()
     doc_count = len(all_files)
 
     if not file_existed and deleted_chunks == 0:
@@ -575,6 +573,52 @@ def get_insights(filename: str):
 @app.get("/api/documents/{filename}/insights")
 def get_insights_api(filename: str):
     return generate_document_insights(filename)
+
+# ── Document Content Viewer Endpoint ──
+def fetch_document_content_internal(filename: str):
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join("knowledge", safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Document '{safe_filename}' not found")
+
+    file_size_bytes = os.path.getsize(file_path)
+    if file_size_bytes < 1024:
+        file_size_str = f"{file_size_bytes} B"
+    elif file_size_bytes < 1024 * 1024:
+        file_size_str = f"{file_size_bytes / 1024:.1f} KB"
+    else:
+        file_size_str = f"{file_size_bytes / (1024 * 1024):.1f} MB"
+
+    ext = os.path.splitext(safe_filename)[1].lower()
+    raw_text = extract_text_from_file(file_path)
+
+    chunks_in_doc = 0
+    if collection:
+        try:
+            all_data = collection.get()
+            for meta in all_data.get("metadatas", []):
+                if meta and os.path.basename(meta.get("source", "")) == safe_filename:
+                    chunks_in_doc += 1
+        except Exception:
+            pass
+
+    return {
+        "filename": safe_filename,
+        "file_type": ext.replace(".", "").upper(),
+        "file_size": file_size_str,
+        "word_count": len(raw_text.split()),
+        "chunks": chunks_in_doc or len(chunk_text(raw_text)),
+        "content": raw_text,
+        "is_empty": not bool(raw_text.strip())
+    }
+
+@app.get("/documents/{filename}/content")
+def get_doc_content(filename: str):
+    return fetch_document_content_internal(filename)
+
+@app.get("/api/documents/{filename}/content")
+def get_doc_content_api(filename: str):
+    return fetch_document_content_internal(filename)
 
 # ── Stats endpoint ──
 @app.get("/stats")

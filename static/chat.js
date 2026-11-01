@@ -462,8 +462,9 @@ function getFileIcon(filename) {
         const icon = getFileIcon(f);
         const safeName = f.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         return `<div class="file-tag">
-          <span class="file-tag-name" onclick="openInsightsModal('${safeName}')" title="Click to view AI Insights for ${f}">${icon} ${f}</span>
+          <span class="file-tag-name" onclick="openDocViewerModal('${safeName}')" title="Click to view content of ${f}">${icon} ${f}</span>
           <div class="file-tag-actions">
+            <button class="view-doc-btn" onclick="openDocViewerModal('${safeName}')" title="View Document Content">👁️</button>
             <button class="insight-doc-btn" onclick="openInsightsModal('${safeName}')" title="AI Insights & Summary">💡</button>
             <button class="delete-doc-btn" onclick="openDeleteModal('${safeName}')" title="Delete '${safeName}'">✕</button>
           </div>
@@ -984,7 +985,7 @@ function closeSourceModal(e) {
 // Close any open modal on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    ["source-modal", "export-modal", "delete-modal", "insights-modal"].forEach(id => {
+    ["source-modal", "export-modal", "delete-modal", "insights-modal", "viewer-modal"].forEach(id => {
       const modal = document.getElementById(id);
       if (modal && modal.classList.contains("open")) {
         modal.classList.remove("open");
@@ -1456,6 +1457,130 @@ function askAboutTopic(topic, filename) {
   }
   sendMessage();
 }
+
+// ── Document Content Viewer Modal & Logic ──
+let activeViewerDoc = null;
+let activeViewerRawContent = "";
+
+async function openDocViewerModal(filename) {
+  activeViewerDoc = filename;
+  const modal = document.getElementById("viewer-modal");
+  const filenameEl = document.getElementById("viewer-filename");
+  const fileIconEl = document.getElementById("viewer-file-icon");
+  const badgesEl = document.getElementById("viewer-meta-badges");
+  const loadingEl = document.getElementById("viewer-loading");
+  const contentEl = document.getElementById("viewer-content");
+  const textBoxEl = document.getElementById("viewer-text-box");
+  const wordCountEl = document.getElementById("viewer-word-count");
+  const chunkCountEl = document.getElementById("viewer-chunk-count");
+
+  if (fileIconEl) fileIconEl.textContent = getFileIcon(filename);
+  if (filenameEl) filenameEl.textContent = filename;
+  if (badgesEl) badgesEl.innerHTML = '<span class="modal-badge">Loading document...</span>';
+  if (loadingEl) {
+    loadingEl.style.display = "flex";
+    loadingEl.innerHTML = '<div class="insights-spinner"></div><p>Loading document content...</p>';
+  }
+  if (contentEl) contentEl.style.display = "none";
+  if (modal) modal.classList.add("open");
+
+  try {
+    const res = await fetch(`${API}/documents/${encodeURIComponent(filename)}/content`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || "Failed to load document content");
+    }
+
+    const data = await res.json();
+    activeViewerRawContent = data.content || "";
+
+    // Metadata Badges
+    const badgesHtml = [
+      `<span class="modal-badge">${data.file_type || 'DOC'}</span>`,
+      `<span class="modal-badge">${data.file_size || '0 KB'}</span>`,
+      `<span class="modal-badge highlight">${data.chunks || 0} chunks</span>`
+    ].join("");
+    if (badgesEl) badgesEl.innerHTML = badgesHtml;
+
+    if (wordCountEl) wordCountEl.textContent = `${(data.word_count || 0).toLocaleString()} words`;
+    if (chunkCountEl) chunkCountEl.textContent = `${data.chunks || 0} indexed chunks`;
+
+    if (textBoxEl) {
+      if (data.is_empty || !activeViewerRawContent.trim()) {
+        textBoxEl.innerHTML = '<div class="viewer-empty-msg">This document appears to be empty or contains no extractable text.</div>';
+      } else {
+        textBoxEl.textContent = activeViewerRawContent;
+      }
+    }
+
+    if (loadingEl) loadingEl.style.display = "none";
+    if (contentEl) contentEl.style.display = "flex";
+
+  } catch (err) {
+    console.error("Viewer error:", err);
+    if (loadingEl) {
+      loadingEl.innerHTML = `<p style="color: #f87171; text-align: center;">⚠️ Could not load document: ${err.message}</p>`;
+    }
+  }
+}
+
+function closeDocViewerModal(e) {
+  if (e && e.target && e.target !== document.getElementById("viewer-modal") && !e.target.classList.contains("modal-close-btn")) {
+    return;
+  }
+  const modal = document.getElementById("viewer-modal");
+  if (modal) modal.classList.remove("open");
+  activeViewerDoc = null;
+}
+
+function copyViewerContent() {
+  if (!activeViewerRawContent) {
+    showToast("No content to copy", "info");
+    return;
+  }
+  navigator.clipboard.writeText(activeViewerRawContent).then(() => {
+    showToast("Document text copied to clipboard!", "success");
+    const copyBtn = document.getElementById("viewer-copy-btn");
+    if (copyBtn) {
+      const orig = copyBtn.innerHTML;
+      copyBtn.innerHTML = "✅ Copied!";
+      setTimeout(() => { copyBtn.innerHTML = orig; }, 2000);
+    }
+  }).catch(() => {
+    showToast("Failed to copy text", "error");
+  });
+}
+
+function switchToInsightsFromViewer() {
+  const doc = activeViewerDoc;
+  closeDocViewerModal();
+  if (doc) {
+    openInsightsModal(doc);
+  }
+}
+
+function switchToViewerFromInsights() {
+  const doc = activeInsightsDoc;
+  closeInsightsModal();
+  if (doc) {
+    openDocViewerModal(doc);
+  }
+}
+
+function askAboutViewerDocument() {
+  if (!activeViewerDoc) return;
+  const doc = activeViewerDoc;
+  closeDocViewerModal();
+
+  const input = document.getElementById("user-input");
+  if (input) {
+    input.value = `Can you summarize the key points and contents of "${doc}"?`;
+    autoResize(input);
+    input.focus();
+  }
+  sendMessage();
+}
+
 
 
 

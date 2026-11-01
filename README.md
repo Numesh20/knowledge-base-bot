@@ -43,9 +43,10 @@
 | 🔊 **Voice Output (Text-to-Speech)** | Listen to AI responses read aloud with localized voice synthesis and clean audio reading |
 | 📋 **One-Click Answer Copy** | Quick-copy AI answers directly to clipboard with visual confirmation |
 | 📊 **Document Insights** | One-click AI summaries, key takeaways, and interactive topic chips for any document |
+| 👁️ **Document Content Viewer** | In-browser preview of full document content with word count, copy text, and quick-ask action |
 | 💬 **Multi-Chat Sessions** | Manage multiple conversation threads in the sidebar with rename, delete, and persistence |
 | 🔍 **Semantic Search** | Finds relevant info even if wording differs using ChromaDB vector embeddings |
-| 📄 **PDF & TXT Document Support** | Upload `.txt` or `.pdf` files directly from the browser for instant indexing |
+| 📄 **Multi-Format Document Support** | Upload `.pdf`, `.docx`, `.csv`, `.md`, or `.txt` files directly from the browser for instant indexing |
 | 🗑️ **Document Management** | Inspect and delete uploaded documents with automatic ChromaDB cache cleanup |
 | ⬇️ **Chat Export** | Download entire conversations as formatted Markdown or Plain Text |
 | 🌓 **Dark & Light Mode** | Modern glassmorphic interface with seamless theme toggle |

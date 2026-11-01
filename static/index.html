@@ -313,7 +313,62 @@
         <!-- Actions -->
         <div class="insights-actions">
           <button class="btn-cancel" onclick="closeInsightsModal()">Close</button>
+          <button class="btn-secondary-action" onclick="switchToViewerFromInsights()" title="Preview full document content">
+            👁️ View Content
+          </button>
           <button class="insights-ask-btn" id="insights-ask-btn" onclick="askAboutCurrentDocument()">
+            💬 Ask About This Document
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DOCUMENT VIEWER MODAL ── -->
+<div class="modal-overlay" id="viewer-modal" onclick="closeDocViewerModal(event)">
+  <div class="modal-card viewer-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon" id="viewer-file-icon">📄</span>
+        <div>
+          <h3 id="viewer-filename">Document Content</h3>
+          <div class="insights-badges" id="viewer-meta-badges">
+            <span class="modal-badge">Loading...</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="closeDocViewerModal()" title="Close">✕</button>
+    </div>
+    <div class="modal-body viewer-modal-body" id="viewer-body">
+      <!-- Loading State -->
+      <div class="insights-loading" id="viewer-loading">
+        <div class="insights-spinner"></div>
+        <p>Loading document content...</p>
+      </div>
+
+      <!-- Loaded Content -->
+      <div class="viewer-content" id="viewer-content" style="display: none;">
+        <div class="viewer-toolbar">
+          <div class="viewer-toolbar-info">
+            <span id="viewer-word-count">0 words</span>
+            <span class="viewer-dot">·</span>
+            <span id="viewer-chunk-count">0 chunks</span>
+          </div>
+          <div class="viewer-toolbar-actions">
+            <button class="copy-btn" id="viewer-copy-btn" onclick="copyViewerContent()">
+              📋 Copy text
+            </button>
+            <button class="viewer-switch-btn" id="viewer-insights-switch-btn" onclick="switchToInsightsFromViewer()" title="View AI Executive Summary & Topics">
+              💡 View Insights
+            </button>
+          </div>
+        </div>
+        <div class="viewer-text-container" id="viewer-text-box"></div>
+
+        <div class="insights-actions" style="margin-top: 16px;">
+          <button class="btn-cancel" onclick="closeDocViewerModal()">Close</button>
+          <button class="insights-ask-btn" onclick="askAboutViewerDocument()">
             💬 Ask About This Document
           </button>
         </div>
