@@ -1,0 +1,33 @@
+# Git & VCS
+.git/
+.gitignore
+
+# Environment & Secrets (NEVER bake secrets into Docker images!)
+.env
+.env.*
+!.env.example
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentation & Assets
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/

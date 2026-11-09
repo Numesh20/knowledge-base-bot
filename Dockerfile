@@ -1,20 +1,28 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
-# Prevent Python from writing .pyc and buffer stdout/stderr
-ENV PYTHONDONTWRITEBYTECODE=1 \
+# Create a non-root user (Hugging Face Spaces runs with UID 1000)
+RUN useradd -m -u 1000 user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=7860
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR $HOME/app
 
-# Copy all application code and documents
-COPY . .
+# Install dependencies first for Docker caching
+COPY --chown=user:user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Hugging Face Spaces requires port 7860
+# Copy all application files
+COPY --chown=user:user . .
+
+# Ensure storage directories exist with write permissions
+RUN mkdir -p knowledge chroma_db && chown -R user:user $HOME/app
+
+USER user
+
+# Hugging Face Spaces standard port
 EXPOSE 7860
 
 # Run FastAPI app

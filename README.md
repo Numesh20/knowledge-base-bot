@@ -4,7 +4,7 @@
 
 ### AI-Powered Knowledge Base Chatbot
 
-[![Python](https://img.shields.io/badge/Python-3.14+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-Free_API-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Web_Server-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_DB-FF6B35?style=for-the-badge)](https://trychroma.com)
@@ -174,6 +174,29 @@ knowledge-base-bot/
 | `/upload` | POST | Upload a `.txt` knowledge file |
 | `/stats` | GET | Get knowledge base statistics |
 | `/clear` | POST | Clear chat history |
+
+---
+
+## 🚀 Cloud Deployment (Hugging Face Spaces - Free)
+
+Deploy your KnowledgeBot to [Hugging Face Spaces](https://huggingface.co/spaces) with Docker in minutes:
+
+1. **Create a Space**:
+   - Go to [huggingface.co/new-space](https://huggingface.co/new-space).
+   - Enter Space name (e.g. `knowledge-bot`).
+   - Space SDK: Select **Docker** (Blank).
+   - Visibility: **Public** or **Private**.
+2. **Configure API Key Secret**:
+   - In your Space, go to **Settings** -> **Variables and secrets**.
+   - Under **Secrets**, click **New secret**.
+   - Name: `GEMINI_API_KEY`
+   - Value: `<your-gemini-api-key>`
+3. **Push Repository**:
+   ```bash
+   git remote add space https://huggingface.co/spaces/<your-username>/knowledge-bot
+   git push space main
+   ```
+   Hugging Face will automatically build your Docker container and host it on port 7860!
 
 ---
 
