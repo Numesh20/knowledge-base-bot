@@ -1,0 +1,30 @@
+# Environment & Secrets (NEVER bake secrets into Docker images!)
+.env
+.env.*
+!.env.example
+
+# Git & Version Control
+.git/
+.gitignore
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentation & image assets (reduces image size)
+screenshots/
