@@ -36,6 +36,8 @@ from pydantic import BaseModel
 from pypdf import PdfReader
 import uvicorn
 import json
+import uuid
+from datetime import datetime, timezone
 
 # ── Gemini client ──
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -682,6 +684,115 @@ def clear_history():
     global chat_history
     chat_history = []
     return {"message": "Chat history cleared"}
+
+# ── Response Feedback System ──
+FEEDBACK_FILE = Path("data/feedback.json")
+
+class FeedbackRequest(BaseModel):
+    message_id: str
+    rating: str  # "positive" or "negative"
+    category: str | None = None
+    comment: str | None = None
+    question: str | None = None
+    answer: str | None = None
+    doc_filter: str | None = None
+    sources: list = []
+
+def load_feedback_data():
+    if not FEEDBACK_FILE.exists():
+        return []
+    try:
+        with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[WARN] Failed to read feedback file: {e}")
+        return []
+
+def save_feedback_data(data):
+    FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = FEEDBACK_FILE.with_suffix(".tmp")
+    with open(temp_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    temp_file.replace(FEEDBACK_FILE)
+
+def process_feedback_submission(req: FeedbackRequest):
+    if req.rating not in ["positive", "negative"]:
+        raise HTTPException(status_code=400, detail="Rating must be 'positive' or 'negative'")
+
+    data = load_feedback_data()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    existing_idx = next((i for i, item in enumerate(data) if item.get("message_id") == req.message_id), None)
+
+    feedback_record = {
+        "id": data[existing_idx]["id"] if existing_idx is not None else f"fb_{uuid.uuid4().hex[:8]}",
+        "message_id": req.message_id,
+        "timestamp": now_iso,
+        "rating": req.rating,
+        "category": req.category,
+        "comment": req.comment.strip() if req.comment else None,
+        "question": req.question,
+        "answer": req.answer,
+        "doc_filter": req.doc_filter,
+        "sources": req.sources or []
+    }
+
+    if existing_idx is not None:
+        data[existing_idx] = feedback_record
+    else:
+        data.append(feedback_record)
+
+    save_feedback_data(data)
+    return {"message": "Feedback recorded successfully", "feedback": feedback_record}
+
+@app.post("/feedback")
+def submit_feedback(req: FeedbackRequest):
+    return process_feedback_submission(req)
+
+@app.post("/api/feedback")
+def submit_feedback_api(req: FeedbackRequest):
+    return process_feedback_submission(req)
+
+def get_feedback_metrics():
+    data = load_feedback_data()
+    total = len(data)
+    positive = sum(1 for item in data if item.get("rating") == "positive")
+    negative = sum(1 for item in data if item.get("rating") == "negative")
+    rate = round((positive / total * 100), 1) if total > 0 else 100.0
+
+    categories = {}
+    for item in data:
+        cat = item.get("category")
+        if cat:
+            categories[cat] = categories.get(cat, 0) + 1
+
+    return {
+        "total": total,
+        "positive": positive,
+        "negative": negative,
+        "satisfaction_rate": rate,
+        "categories": categories,
+        "recent": data[-15:][::-1]
+    }
+
+@app.get("/feedback/stats")
+def feedback_stats():
+    return get_feedback_metrics()
+
+@app.get("/api/feedback/stats")
+def feedback_stats_api():
+    return get_feedback_metrics()
+
+@app.get("/feedback/export")
+def export_feedback():
+    if not FEEDBACK_FILE.exists():
+        return JSONResponse(content=[], headers={"Content-Disposition": "attachment; filename=feedback.json"})
+    return FileResponse(FEEDBACK_FILE, filename="feedback.json", media_type="application/json")
+
+@app.get("/api/feedback/export")
+def export_feedback_api():
+    if not FEEDBACK_FILE.exists():
+        return JSONResponse(content=[], headers={"Content-Disposition": "attachment; filename=feedback.json"})
+    return FileResponse(FEEDBACK_FILE, filename="feedback.json", media_type="application/json")
 
 # ── Run server ──
 if __name__ == "__main__":

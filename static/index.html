@@ -87,6 +87,7 @@
 
   <!-- Sidebar action buttons -->
   <div class="sidebar-actions">
+    <button class="feedback-stats-btn" onclick="openFeedbackStatsModal()" title="View AI Response Quality & User Feedback">⭐ Quality & Feedback</button>
     <button class="export-btn" onclick="openExportModal()" title="Download conversation">⬇️ Export Chat</button>
     <button class="clear-btn" onclick="clearHistory()">🗑️ Clear History</button>
   </div>
@@ -388,6 +389,76 @@
           <button class="insights-ask-btn" onclick="askAboutViewerDocument()">
             💬 Ask About This Document
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── RESPONSE FEEDBACK STATS MODAL ── -->
+<div class="modal-overlay" id="feedback-stats-modal" onclick="closeFeedbackStatsModal(event)">
+  <div class="modal-card feedback-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon feedback-icon">⭐</span>
+        <div>
+          <h3>AI Response Quality & Feedback</h3>
+          <div class="insights-badges" id="feedback-meta-badges">
+            <span class="modal-badge" id="feedback-total-badge">0 Ratings</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="closeFeedbackStatsModal()" title="Close">✕</button>
+    </div>
+    <div class="modal-body feedback-modal-body" id="feedback-body">
+      <!-- Loading State -->
+      <div class="insights-loading" id="feedback-loading">
+        <div class="insights-spinner"></div>
+        <p>Loading quality analytics...</p>
+      </div>
+
+      <!-- Loaded Content -->
+      <div class="feedback-modal-content" id="feedback-modal-content" style="display: none;">
+        <!-- Metrics Cards -->
+        <div class="fb-metric-cards">
+          <div class="fb-metric-card highlight">
+            <span class="fb-card-label">Satisfaction Rate</span>
+            <span class="fb-card-value" id="fb-rate-val">100%</span>
+            <span class="fb-card-sub" id="fb-rate-sub">From all submitted ratings</span>
+          </div>
+          <div class="fb-metric-card helpful">
+            <span class="fb-card-label">Helpful (👍)</span>
+            <span class="fb-card-value" id="fb-pos-val">0</span>
+            <span class="fb-card-sub">Positive votes</span>
+          </div>
+          <div class="fb-metric-card needs-work">
+            <span class="fb-card-label">Needs Improvement (👎)</span>
+            <span class="fb-card-value" id="fb-neg-val">0</span>
+            <span class="fb-card-sub">Improvement flags</span>
+          </div>
+        </div>
+
+        <!-- Issue Categories Breakdown -->
+        <div class="fb-breakdown-section" id="fb-breakdown-section" style="display: none;">
+          <div class="fb-section-title">📉 Reported Improvement Areas</div>
+          <div class="fb-category-list" id="fb-category-list"></div>
+        </div>
+
+        <!-- Recent Feedback Log -->
+        <div class="fb-log-section">
+          <div class="fb-log-header">
+            <div class="fb-section-title">📝 Recent Feedback Logs</div>
+            <button class="fb-export-btn" onclick="exportFeedbackData()" title="Download raw feedback JSON">
+              ⬇️ Export JSON
+            </button>
+          </div>
+          <div class="fb-log-list" id="fb-log-list">
+            <p class="no-files">No feedback submitted yet. Rate answers using 👍 or 👎 in the chat!</p>
+          </div>
+        </div>
+
+        <div class="insights-actions" style="margin-top: 18px;">
+          <button class="btn-cancel" onclick="closeFeedbackStatsModal()">Close</button>
         </div>
       </div>
     </div>

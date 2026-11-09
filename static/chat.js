@@ -1,4 +1,4 @@
-﻿// ── KnowledgeBot Web UI — chat.js ──
+// ── KnowledgeBot Web UI — chat.js ──
 
 const API = "";  // same origin
 
@@ -146,6 +146,24 @@ function updateDocScopeUI() {
 
 // ── Text-to-Speech (Voice Output) & Message Actions ──
 const messageTextRegistry = {};
+const messageMetadataRegistry = {};
+
+function loadFeedbackStates() {
+  try {
+    const raw = localStorage.getItem("kb_feedback_states");
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveFeedbackStates() {
+  try {
+    localStorage.setItem("kb_feedback_states", JSON.stringify(feedbackStateRegistry));
+  } catch (e) {}
+}
+
+const feedbackStateRegistry = loadFeedbackStates();
 let currentSpeakingMsgId = null;
 
 function cleanTextForSpeech(text) {
@@ -264,6 +282,10 @@ function copyMessageText(msgId) {
 }
 
 function createMsgActionsHTML(msgId) {
+  const currentFb = feedbackStateRegistry[msgId] || null;
+  const isUp = currentFb && currentFb.rating === "positive";
+  const isDown = currentFb && currentFb.rating === "negative";
+
   return `
     <div class="msg-actions-row">
       <button type="button" class="msg-action-btn tts-btn" id="tts-btn-${msgId}" onclick="toggleTTS('${msgId}')" title="Listen to response (Text-to-Speech)">
@@ -274,8 +296,261 @@ function createMsgActionsHTML(msgId) {
         <span class="copy-icon">📋</span>
         <span class="copy-label">Copy</span>
       </button>
+      <button type="button" class="msg-action-btn feedback-btn fb-up ${isUp ? "active" : ""}" id="fb-up-${msgId}" onclick="handleFeedback('${msgId}', 'positive')" title="Good response (Helpful)">
+        <span class="fb-icon">👍</span>
+        <span class="fb-label">Helpful</span>
+      </button>
+      <button type="button" class="msg-action-btn feedback-btn fb-down ${isDown ? "active" : ""}" id="fb-down-${msgId}" onclick="handleFeedback('${msgId}', 'negative')" title="Poor response (Needs improvement)">
+        <span class="fb-icon">👎</span>
+      </button>
     </div>
+    <div class="feedback-drawer" id="fb-drawer-${msgId}" style="display: none;"></div>
   `;
+}
+
+// ── Response Feedback Handlers ──
+async function handleFeedback(msgId, rating) {
+  const upBtn = document.getElementById(`fb-up-${msgId}`);
+  const downBtn = document.getElementById(`fb-down-${msgId}`);
+  const drawer = document.getElementById(`fb-drawer-${msgId}`);
+
+  if (rating === "positive") {
+    if (feedbackStateRegistry[msgId]?.rating === "positive") {
+      showToast("Already marked as helpful! 👍", "info");
+      return;
+    }
+
+    feedbackStateRegistry[msgId] = { rating: "positive", timestamp: Date.now() };
+    saveFeedbackStates();
+
+    if (upBtn) upBtn.classList.add("active");
+    if (downBtn) downBtn.classList.remove("active");
+    if (drawer) {
+      drawer.style.display = "none";
+      drawer.innerHTML = "";
+    }
+
+    const meta = messageMetadataRegistry[msgId] || {};
+    try {
+      await fetch(`${API}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_id: msgId,
+          rating: "positive",
+          question: meta.question || "",
+          answer: meta.answer || messageTextRegistry[msgId] || "",
+          doc_filter: meta.docFilter || currentDocScope || "all",
+          sources: meta.sources || []
+        })
+      });
+      showToast("Thanks for the feedback! 👍", "success");
+    } catch (e) {
+      showToast("Feedback recorded locally", "info");
+    }
+  } else if (rating === "negative") {
+    if (!drawer) return;
+
+    if (drawer.style.display !== "none" && drawer.innerHTML.trim()) {
+      closeFeedbackDrawer(msgId);
+      return;
+    }
+
+    drawer.innerHTML = `
+      <div class="feedback-box">
+        <div class="fb-box-header">
+          <span class="fb-box-title">Why wasn't this answer helpful?</span>
+          <button type="button" class="fb-close-btn" onclick="closeFeedbackDrawer('${msgId}')" title="Close">✕</button>
+        </div>
+        <div class="fb-chips-row">
+          <button type="button" class="fb-reason-chip" onclick="toggleFbChip(this)">❌ Inaccurate</button>
+          <button type="button" class="fb-reason-chip" onclick="toggleFbChip(this)">❓ Didn't answer</button>
+          <button type="button" class="fb-reason-chip" onclick="toggleFbChip(this)">📉 Missing context</button>
+          <button type="button" class="fb-reason-chip" onclick="toggleFbChip(this)">🔍 Irrelevant source</button>
+        </div>
+        <textarea class="fb-comment-input" id="fb-comment-${msgId}" placeholder="How could this answer be improved? (optional)" rows="2"></textarea>
+        <div class="fb-box-actions">
+          <button type="button" class="fb-submit-btn" onclick="submitDetailedFeedback('${msgId}')">Submit Feedback</button>
+          <button type="button" class="fb-cancel-btn" onclick="closeFeedbackDrawer('${msgId}')">Cancel</button>
+        </div>
+      </div>
+    `;
+    drawer.style.display = "block";
+    const commentInput = document.getElementById(`fb-comment-${msgId}`);
+    if (commentInput) commentInput.focus();
+  }
+}
+
+function toggleFbChip(btn) {
+  btn.classList.toggle("selected");
+}
+
+function closeFeedbackDrawer(msgId) {
+  const drawer = document.getElementById(`fb-drawer-${msgId}`);
+  if (drawer) {
+    drawer.style.display = "none";
+    drawer.innerHTML = "";
+  }
+}
+
+async function submitDetailedFeedback(msgId) {
+  const drawer = document.getElementById(`fb-drawer-${msgId}`);
+  const upBtn = document.getElementById(`fb-up-${msgId}`);
+  const downBtn = document.getElementById(`fb-down-${msgId}`);
+
+  const activeChips = drawer ? Array.from(drawer.querySelectorAll(".fb-reason-chip.selected")).map(c => c.textContent.replace(/^[^\w\s]+/, '').trim()) : [];
+  const commentEl = document.getElementById(`fb-comment-${msgId}`);
+  const comment = commentEl ? commentEl.value.trim() : "";
+  const category = activeChips.length > 0 ? activeChips.join(", ") : (comment ? "User note" : "Unhelpful");
+
+  feedbackStateRegistry[msgId] = {
+    rating: "negative",
+    category,
+    comment,
+    timestamp: Date.now()
+  };
+  saveFeedbackStates();
+
+  if (downBtn) downBtn.classList.add("active");
+  if (upBtn) upBtn.classList.remove("active");
+
+  if (drawer) {
+    drawer.innerHTML = `<div class="fb-submitted-tag">✓ Feedback recorded. Thank you for helping improve the knowledge base!</div>`;
+    setTimeout(() => {
+      if (drawer && drawer.innerHTML.includes("fb-submitted-tag")) {
+        drawer.style.display = "none";
+        drawer.innerHTML = "";
+      }
+    }, 4000);
+  }
+
+  const meta = messageMetadataRegistry[msgId] || {};
+  try {
+    await fetch(`${API}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message_id: msgId,
+        rating: "negative",
+        category,
+        comment,
+        question: meta.question || "",
+        answer: meta.answer || messageTextRegistry[msgId] || "",
+        doc_filter: meta.docFilter || currentDocScope || "all",
+        sources: meta.sources || []
+      })
+    });
+    showToast("Feedback submitted. Thank you! 👎", "info");
+  } catch (e) {
+    showToast("Feedback recorded locally", "info");
+  }
+}
+
+// ── Feedback Analytics Modal Handlers ──
+async function openFeedbackStatsModal() {
+  const modal = document.getElementById("feedback-stats-modal");
+  const loading = document.getElementById("feedback-loading");
+  const content = document.getElementById("feedback-modal-content");
+  if (!modal) return;
+
+  modal.classList.add("open");
+  if (loading) loading.style.display = "flex";
+  if (content) content.style.display = "none";
+
+  try {
+    const res = await fetch(`${API}/feedback/stats`);
+    const data = await res.json();
+
+    const totalBadge = document.getElementById("feedback-total-badge");
+    if (totalBadge) totalBadge.textContent = `${data.total} Rating${data.total === 1 ? "" : "s"}`;
+    const rateVal = document.getElementById("fb-rate-val");
+    if (rateVal) rateVal.textContent = `${data.satisfaction_rate}%`;
+    const rateSub = document.getElementById("fb-rate-sub");
+    if (rateSub) rateSub.textContent = data.total > 0 ? `From ${data.total} user rating${data.total === 1 ? "" : "s"}` : "No ratings submitted yet";
+    const posVal = document.getElementById("fb-pos-val");
+    if (posVal) posVal.textContent = data.positive;
+    const negVal = document.getElementById("fb-neg-val");
+    if (negVal) negVal.textContent = data.negative;
+
+    // Issue breakdown
+    const breakdownSection = document.getElementById("fb-breakdown-section");
+    const categoryList = document.getElementById("fb-category-list");
+    const catKeys = Object.keys(data.categories || {});
+
+    if (catKeys.length > 0 && categoryList) {
+      breakdownSection.style.display = "block";
+      const totalCatIssues = Object.values(data.categories).reduce((a, b) => a + b, 0);
+      categoryList.innerHTML = catKeys.map(cat => {
+        const count = data.categories[cat];
+        const pct = totalCatIssues > 0 ? Math.round((count / totalCatIssues) * 100) : 0;
+        return `
+          <div class="fb-category-row">
+            <div class="fb-cat-header">
+              <span class="fb-cat-name">${cat}</span>
+              <span class="fb-cat-count">${count} (${pct}%)</span>
+            </div>
+            <div class="fb-cat-bar-bg">
+              <div class="fb-cat-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    } else if (breakdownSection) {
+      breakdownSection.style.display = "none";
+    }
+
+    // Recent logs
+    const logList = document.getElementById("fb-log-list");
+    if (logList) {
+      if (!data.recent || data.recent.length === 0) {
+        logList.innerHTML = '<p class="no-files">No feedback submitted yet. Rate answers using 👍 or 👎 in the chat!</p>';
+      } else {
+        logList.innerHTML = data.recent.map(item => {
+          const isPos = item.rating === "positive";
+          const icon = isPos ? "👍" : "👎";
+          const tagClass = isPos ? "pos" : "neg";
+          const safeQ = (item.question || "Chat question").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const safeComment = item.comment ? `<div class="fb-log-comment">“${item.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}”</div>` : "";
+          const safeCat = item.category ? `<span class="fb-log-cat-pill">${item.category.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>` : "";
+          const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : "";
+
+          return `
+            <div class="fb-log-item">
+              <div class="fb-log-top">
+                <span class="fb-log-badge ${tagClass}">${icon} ${isPos ? "Helpful" : "Needs Improvement"}</span>
+                ${safeCat}
+                <span class="fb-log-time">${timeStr}</span>
+              </div>
+              <div class="fb-log-q">Q: ${safeQ}</div>
+              ${safeComment}
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    if (loading) loading.style.display = "none";
+    if (content) content.style.display = "block";
+
+  } catch (err) {
+    if (loading) loading.style.display = "none";
+    if (content) {
+      content.style.display = "block";
+      content.innerHTML = `<p class="no-files">Could not fetch feedback statistics. Ensure the server is running.</p>`;
+    }
+  }
+}
+
+function closeFeedbackStatsModal(event) {
+  if (event && event.target && !event.target.classList.contains("modal-overlay") && !event.target.classList.contains("modal-close-btn") && !event.target.classList.contains("btn-cancel")) {
+    return;
+  }
+  const modal = document.getElementById("feedback-stats-modal");
+  if (modal) modal.classList.remove("open");
+}
+
+function exportFeedbackData() {
+  window.open(`${API}/feedback/export`, "_blank");
 }
 
 // ── Multi-Chat Sessions ──
@@ -898,6 +1173,12 @@ async function sendMessage() {
               document.getElementById("stat-chats").textContent = ev.history_length;
             }
             messageTextRegistry[msgId] = fullText || "No response generated.";
+            messageMetadataRegistry[msgId] = {
+              question: message,
+              answer: fullText || "No response generated.",
+              docFilter: currentDocScope,
+              sources: ev.sources || []
+            };
             const actionsEl = botMsg.querySelector(".actions-container");
             if (actionsEl) {
               actionsEl.innerHTML = createMsgActionsHTML(msgId);
@@ -935,6 +1216,12 @@ async function sendMessage() {
       }
       document.getElementById("stat-chats").textContent = data.history_length;
       messageTextRegistry[msgId] = data.answer;
+      messageMetadataRegistry[msgId] = {
+        question: message,
+        answer: data.answer,
+        docFilter: currentDocScope,
+        sources: data.sources || []
+      };
       const actionsEl = botMsg.querySelector(".actions-container");
       if (actionsEl) {
         actionsEl.innerHTML = createMsgActionsHTML(msgId);
@@ -969,6 +1256,12 @@ function addMessage(role, text, sources = [], docFilter = null) {
   if (role === "bot" && text) {
     const msgId = "msg_" + Math.random().toString(36).slice(2, 10);
     messageTextRegistry[msgId] = text;
+    messageMetadataRegistry[msgId] = {
+      question: "",
+      answer: text,
+      docFilter: docFilter || "all",
+      sources: sources || []
+    };
     actionsHTML = `<div class="actions-container" id="actions-${msgId}">${createMsgActionsHTML(msgId)}</div>`;
   }
 

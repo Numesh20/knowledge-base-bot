@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 COPY --chown=user:user . .
 
 # Ensure storage directories exist with write permissions
-RUN mkdir -p knowledge chroma_db && chown -R user:user $HOME/app
+RUN mkdir -p knowledge chroma_db data && chown -R user:user $HOME/app
 
 USER user
 

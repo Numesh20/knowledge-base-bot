@@ -48,6 +48,7 @@
 | 💬 **Multi-Chat Sessions & Pinning** | Manage multiple conversation threads with real-time keyword search, pin-to-top (📌), rename, delete, and persistence |
 | 🔍 **Semantic Search** | Finds relevant info even if wording differs using ChromaDB vector embeddings |
 | 📄 **Multi-Format Document Support** | Upload `.pdf`, `.docx`, `.csv`, `.md`, or `.txt` files directly from the browser for instant indexing |
+| 👍 **Response Feedback & Analytics** | Rate answers with 👍 / 👎, tag improvement reasons, and track satisfaction metrics |
 | 🗑️ **Document Management** | Inspect and delete uploaded documents with automatic ChromaDB cache cleanup |
 | ⬇️ **Chat Export** | Download entire conversations as formatted Markdown or Plain Text |
 | 🌓 **Dark & Light Mode** | Modern glassmorphic interface with seamless theme toggle |
@@ -171,7 +172,13 @@ knowledge-base-bot/
 |----------|--------|-------------|
 | `/` | GET | Serve the chat web UI |
 | `/chat` | POST | Send a message, get an answer |
-| `/upload` | POST | Upload a `.txt` knowledge file |
+| `/stream` | POST | Real-time SSE streaming answer with retrieved citations |
+| `/upload` | POST | Upload and index document (.pdf, .docx, .csv, .md, .txt) |
+| `/documents/{filename}/insights` | GET | AI executive summary, key takeaways, and core topics |
+| `/documents/{filename}/content` | GET | Preview full raw document content in-browser |
+| `/feedback` | POST | Submit positive or negative rating and improvement feedback |
+| `/feedback/stats` | GET | Aggregated satisfaction score, issue counts, and recent logs |
+| `/feedback/export` | GET | Export feedback entries as JSON |
 | `/stats` | GET | Get knowledge base statistics |
 | `/clear` | POST | Clear chat history |
 
@@ -214,11 +221,14 @@ Deploy your KnowledgeBot to [Hugging Face Spaces](https://huggingface.co/spaces)
 - [x] Terminal chatbot
 - [x] Web UI with file upload
 - [x] Chat memory (session history)
-- [ ] PDF support
-- [ ] Auto-learning scheduler
-- [ ] Online deployment
-- [ ] User feedback (thumbs up/down)
-- [ ] Multi-language support
+- [x] PDF & multi-format support (.pdf, .docx, .csv, .md, .txt)
+- [x] Multi-language support (10+ languages)
+- [x] Voice input & output (STT & TTS)
+- [x] Document insights & full text viewer
+- [x] Document scope filter & conversation search / pinning
+- [x] User feedback (thumbs up/down with quality analytics)
+- [x] Cloud deployment (Hugging Face Spaces Docker)
+- [ ] Auto-learning re-indexing scheduler
 
 ---
 
